@@ -118,20 +118,19 @@ SHIPPING_FIXED=25
 
 ## Rodando localmente
 
-Em um terminal:
+**Opção 1 — atalhos da raiz** (recomendado):
 
 ```bash
-cd backend
-npm install
-npm run dev          # http://localhost:4000
+npm install              # instala deps da raiz (npm-run-all)
+npm run install:all      # instala backend e frontend
+npm run dev              # roda backend (:4000) e frontend (:5173) juntos
 ```
 
-Em outro terminal:
+**Opção 2 — terminais separados**:
 
 ```bash
-cd frontend
-npm install
-npm run dev          # http://localhost:5173
+cd backend && npm install && npm run dev    # http://localhost:4000
+cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
 Abra <http://localhost:5173>, faça **Cadastro**, e você cai no dashboard. Para popular o catálogo, promova seu usuário a admin (próxima seção) e use o painel `/admin`.
