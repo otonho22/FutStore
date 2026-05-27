@@ -8,9 +8,21 @@ import usersRouter from './routes/users.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
-const origin = process.env.ALLOWED_ORIGIN ?? 'http://localhost:5173';
+const origin = process.env.ALLOWED_ORIGIN ?? 'http://localhost:5173,http://localhost:5174,http://localhost:5175';
+const allowedOrigins = origin.split(',').map((s) => s.trim()).filter(Boolean);
 
-app.use(cors({ origin: origin.split(',').map((s) => s.trim()) }));
+app.use(
+  cors({
+    origin(o, cb) {
+      // Allow requests with no origin (curl, server-to-server) and any localhost dev port
+      if (!o) return cb(null, true);
+      if (allowedOrigins.includes(o)) return cb(null, true);
+      if (/^http:\/\/localhost:\d+$/.test(o)) return cb(null, true);
+      return cb(new Error(`Origin ${o} not allowed by CORS`));
+    },
+    credentials: true,
+  }),
+);
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));

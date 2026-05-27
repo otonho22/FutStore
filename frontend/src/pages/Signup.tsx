@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import GoogleButton from '../components/GoogleButton';
 
 export default function Signup() {
   const { signup } = useAuth();
@@ -58,6 +59,8 @@ export default function Signup() {
         <button type="submit" className="primary" disabled={loading}>
           {loading ? 'Criando…' : 'Cadastrar'}
         </button>
+        <div className="auth-divider"><span>ou</span></div>
+        <GoogleButton label="Cadastrar com Google" />
         <p className="muted center" style={{ marginBottom: 0 }}>
           Já tem conta? <Link to="/login">Entrar</Link>
         </p>

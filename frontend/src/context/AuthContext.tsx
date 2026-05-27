@@ -3,6 +3,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -15,6 +17,7 @@ interface AuthState {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, displayName: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   refreshRole: () => Promise<void>;
 }
@@ -56,6 +59,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  async function loginWithGoogle() {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const cred = await signInWithPopup(auth, provider);
+    // Garante que existe doc do usuário no Firestore
+    await cred.user.getIdToken(true);
+    try {
+      await api('/api/users/me', {
+        method: 'POST',
+        body: JSON.stringify({
+          displayName: cred.user.displayName ?? cred.user.email ?? 'Usuário',
+          acceptedTerms: true,
+        }),
+      });
+    } catch {
+      // não fatal — provavelmente já existia
+    }
+  }
+
   async function logout() {
     await signOut(auth);
   }
@@ -68,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, login, signup, logout, refreshRole }}>
+    <AuthContext.Provider value={{ user, role, loading, login, signup, loginWithGoogle, logout, refreshRole }}>
       {children}
     </AuthContext.Provider>
   );
