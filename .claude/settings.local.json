@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import pandas as pd; xl = pd.read_excel\\('RF e RNF \\(3\\) \\(1\\).xlsx', sheet_name=None\\); [print\\(f'=== {n} ===\\\\n', d.to_string\\(\\)\\) for n, d in xl.items\\(\\)]\")",
+      "Bash(where python3 *)",
+      "Bash(py -c \"import pandas as pd; xl = pd.read_excel\\('RF e RNF \\(3\\) \\(1\\).xlsx', sheet_name=None\\); [print\\(f'=== {n} ===\\\\n', d.to_string\\(\\)\\) for n, d in xl.items\\(\\)]\")",
+      "Bash(py -m pip install pandas openpyxl --quiet)"
+    ]
+  }
+}
