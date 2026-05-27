@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { db } from '../firebase.js';
+import { prisma } from '../db.js';
 import { requireAuth, requireAdmin, type AuthedRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -14,40 +14,39 @@ const couponSchema = z.object({
 });
 
 router.get('/', requireAuth, requireAdmin, async (_req, res) => {
-  const snap = await db.collection('coupons').orderBy('code').get();
-  res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  const coupons = await prisma.coupon.findMany({ orderBy: { code: 'asc' } });
+  res.json(coupons);
 });
 
 router.get('/validate/:code', requireAuth, async (req, res) => {
   const code = req.params.code.toUpperCase();
-  const snap = await db.collection('coupons').where('code', '==', code).limit(1).get();
-  if (snap.empty) return res.status(404).json({ error: 'Cupom não encontrado' });
-  const data = snap.docs[0].data();
-  if (!data.active) return res.status(400).json({ error: 'Cupom inativo' });
-  if (new Date(data.validUntil) < new Date()) {
-    return res.status(400).json({ error: 'Cupom expirado' });
-  }
-  res.json({ id: snap.docs[0].id, ...data });
+  const coupon = await prisma.coupon.findUnique({ where: { code } });
+  if (!coupon) return res.status(404).json({ error: 'Cupom não encontrado' });
+  if (!coupon.active) return res.status(400).json({ error: 'Cupom inativo' });
+  if (coupon.validUntil < new Date()) return res.status(400).json({ error: 'Cupom expirado' });
+  res.json(coupon);
 });
 
 router.post('/', requireAuth, requireAdmin, async (req: AuthedRequest, res) => {
   const parsed = couponSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const ref = await db.collection('coupons').add({ ...parsed.data, createdAt: new Date() });
-  const doc = await ref.get();
-  res.status(201).json({ id: doc.id, ...doc.data() });
+  const created = await prisma.coupon.create({
+    data: { ...parsed.data, validUntil: new Date(parsed.data.validUntil) },
+  });
+  res.status(201).json(created);
 });
 
 router.put('/:id', requireAuth, requireAdmin, async (req: AuthedRequest, res) => {
   const parsed = couponSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  await db.collection('coupons').doc(req.params.id).update(parsed.data);
-  const doc = await db.collection('coupons').doc(req.params.id).get();
-  res.json({ id: doc.id, ...doc.data() });
+  const data: any = { ...parsed.data };
+  if (data.validUntil) data.validUntil = new Date(data.validUntil);
+  const updated = await prisma.coupon.update({ where: { id: req.params.id }, data });
+  res.json(updated);
 });
 
 router.delete('/:id', requireAuth, requireAdmin, async (req: AuthedRequest, res) => {
-  await db.collection('coupons').doc(req.params.id).delete();
+  await prisma.coupon.delete({ where: { id: req.params.id } });
   res.status(204).end();
 });
 

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { db, FieldValue } from '../firebase.js';
+import { prisma } from '../db.js';
 import { requireAuth, requireAdmin, type AuthedRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -30,7 +30,46 @@ const orderSchema = z.object({
   address: addressSchema,
 });
 
+const statusSchema = z.object({
+  status: z.enum(['pendente', 'pago', 'enviado', 'entregue', 'cancelado']),
+  trackingCode: z.string().optional(),
+});
+
 const SHIPPING_FIXED = Number(process.env.SHIPPING_FIXED ?? 25);
+
+function serialize(o: any) {
+  return {
+    id: o.id,
+    userId: o.userId,
+    userEmail: o.userEmail,
+    items: (o.items ?? []).map((i: any) => ({
+      productId: i.productId,
+      name: i.name,
+      size: i.size,
+      unitPrice: i.unitPrice,
+      quantity: i.quantity,
+      imageUrl: i.imageUrl ?? undefined,
+    })),
+    couponCode: o.couponCode,
+    subtotal: o.subtotal,
+    discount: o.discount,
+    shipping: o.shipping,
+    total: o.total,
+    status: o.status,
+    statusHistory: o.statusHistory ?? [],
+    trackingCode: o.trackingCode,
+    createdAt: o.createdAt,
+    address: {
+      fullName: o.addressFullName,
+      street: o.addressStreet,
+      number: o.addressNumber,
+      complement: o.addressComplement ?? undefined,
+      city: o.addressCity,
+      state: o.addressState,
+      zip: o.addressZip,
+    },
+  };
+}
 
 router.post('/', requireAuth, async (req: AuthedRequest, res) => {
   const parsed = orderSchema.safeParse(req.body);
@@ -38,127 +77,155 @@ router.post('/', requireAuth, async (req: AuthedRequest, res) => {
   const { items, couponCode, address } = parsed.data;
 
   try {
-    const orderRef = db.collection('orders').doc();
-    const created = await db.runTransaction(async (tx) => {
-      const productRefs = items.map((i) => db.collection('products').doc(i.productId));
-      const productSnaps = await tx.getAll(...productRefs);
+    const created = await prisma.$transaction(async (tx) => {
+      // 1) Garante que o user existe (pode ser primeiro pedido via login Google sem POST /users/me)
+      await tx.user.upsert({
+        where: { id: req.user!.uid },
+        create: {
+          id: req.user!.uid,
+          email: req.user!.email ?? '',
+          role: 'customer',
+        },
+        update: {},
+      });
+
+      // 2) Carrega produtos e valida estoque
+      const productIds = items.map((i) => i.productId);
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds } },
+        include: { sizes: true },
+      });
 
       let subtotal = 0;
-      for (let i = 0; i < items.length; i++) {
-        const snap = productSnaps[i];
-        if (!snap.exists) throw new Error(`Produto ${items[i].productId} não existe`);
-        const p = snap.data()!;
-        const sz = (p.sizes as { size: string; stock: number }[]).find(
-          (s) => s.size === items[i].size,
-        );
-        if (!sz || sz.stock < items[i].quantity) {
-          throw new Error(`Estoque insuficiente para ${p.name} tamanho ${items[i].size}`);
+      for (const item of items) {
+        const product = products.find((p) => p.id === item.productId);
+        if (!product) throw new Error(`Produto ${item.productId} não existe`);
+        const sz = product.sizes.find((s) => s.size === item.size);
+        if (!sz || sz.stock < item.quantity) {
+          throw new Error(`Estoque insuficiente para ${product.name} tamanho ${item.size}`);
         }
-        subtotal += items[i].unitPrice * items[i].quantity;
+        subtotal += item.unitPrice * item.quantity;
       }
 
+      // 3) Cupom (opcional)
       let discount = 0;
       let appliedCoupon: string | null = null;
       if (couponCode) {
         const code = couponCode.toUpperCase();
-        const couponSnap = await tx.get(
-          db.collection('coupons').where('code', '==', code).limit(1),
-        );
-        if (!couponSnap.empty) {
-          const c = couponSnap.docs[0].data();
-          if (c.active && new Date(c.validUntil) >= new Date()) {
-            discount = c.type === 'percent' ? subtotal * (c.value / 100) : c.value;
-            discount = Math.min(discount, subtotal);
-            appliedCoupon = code;
-          }
+        const coupon = await tx.coupon.findUnique({ where: { code } });
+        if (coupon && coupon.active && coupon.validUntil >= new Date()) {
+          discount = coupon.type === 'percent' ? subtotal * (coupon.value / 100) : coupon.value;
+          discount = Math.min(discount, subtotal);
+          appliedCoupon = code;
         }
       }
 
       const shipping = SHIPPING_FIXED;
       const total = Math.max(0, subtotal - discount + shipping);
 
-      for (let i = 0; i < items.length; i++) {
-        const snap = productSnaps[i];
-        const p = snap.data()!;
-        const sizes = (p.sizes as { size: string; stock: number }[]).map((s) =>
-          s.size === items[i].size ? { ...s, stock: s.stock - items[i].quantity } : s,
-        );
-        tx.update(productRefs[i], {
-          sizes,
-          salesCount: FieldValue.increment(items[i].quantity),
+      // 4) Decrementa estoque + incrementa salesCount
+      for (const item of items) {
+        await tx.productSize.update({
+          where: { productId_size: { productId: item.productId, size: item.size } },
+          data: { stock: { decrement: item.quantity } },
+        });
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { salesCount: { increment: item.quantity } },
         });
       }
 
+      // 5) Cria o pedido
       const now = new Date();
-      const orderData = {
-        userId: req.user!.uid,
-        userEmail: req.user!.email ?? null,
-        items,
-        couponCode: appliedCoupon,
-        subtotal,
-        discount,
-        shipping,
-        total,
-        address,
-        status: 'pendente' as const,
-        statusHistory: [{ status: 'pendente', at: now }],
-        trackingCode: null,
-        createdAt: now,
-      };
-      tx.set(orderRef, orderData);
-      return { id: orderRef.id, ...orderData };
+      const order = await tx.order.create({
+        data: {
+          userId: req.user!.uid,
+          userEmail: req.user!.email ?? null,
+          couponCode: appliedCoupon,
+          subtotal,
+          discount,
+          shipping,
+          total,
+          status: 'pendente',
+          trackingCode: null,
+          statusHistory: [{ status: 'pendente', at: now.toISOString() }] as any,
+          addressFullName: address.fullName,
+          addressStreet: address.street,
+          addressNumber: address.number,
+          addressComplement: address.complement ?? null,
+          addressCity: address.city,
+          addressState: address.state,
+          addressZip: address.zip,
+          items: {
+            create: items.map((i) => ({
+              productId: i.productId,
+              name: i.name,
+              size: i.size,
+              unitPrice: i.unitPrice,
+              quantity: i.quantity,
+              imageUrl: i.imageUrl ?? null,
+            })),
+          },
+        },
+        include: { items: true },
+      });
+
+      return order;
     });
 
-    res.status(201).json(created);
+    res.status(201).json(serialize(created));
   } catch (e: any) {
     res.status(400).json({ error: e.message ?? 'Erro ao criar pedido' });
   }
 });
 
 router.get('/mine', requireAuth, async (req: AuthedRequest, res) => {
-  const snap = await db
-    .collection('orders')
-    .where('userId', '==', req.user!.uid)
-    .orderBy('createdAt', 'desc')
-    .get();
-  res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  const orders = await prisma.order.findMany({
+    where: { userId: req.user!.uid },
+    orderBy: { createdAt: 'desc' },
+    include: { items: true },
+  });
+  res.json(orders.map(serialize));
 });
 
 router.get('/:id', requireAuth, async (req: AuthedRequest, res) => {
-  const doc = await db.collection('orders').doc(req.params.id).get();
-  if (!doc.exists) return res.status(404).json({ error: 'Not found' });
-  const data = doc.data()!;
-  if (data.userId !== req.user!.uid && req.user!.role !== 'admin') {
+  const order = await prisma.order.findUnique({
+    where: { id: req.params.id },
+    include: { items: true },
+  });
+  if (!order) return res.status(404).json({ error: 'Not found' });
+  if (order.userId !== req.user!.uid && req.user!.role !== 'admin') {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  res.json({ id: doc.id, ...data });
+  res.json(serialize(order));
 });
 
 router.get('/', requireAuth, requireAdmin, async (_req, res) => {
-  const snap = await db.collection('orders').orderBy('createdAt', 'desc').limit(200).get();
-  res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-});
-
-const statusSchema = z.object({
-  status: z.enum(['pendente', 'pago', 'enviado', 'entregue', 'cancelado']),
-  trackingCode: z.string().optional(),
+  const orders = await prisma.order.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+    include: { items: true },
+  });
+  res.json(orders.map(serialize));
 });
 
 router.patch('/:id/status', requireAuth, requireAdmin, async (req: AuthedRequest, res) => {
   const parsed = statusSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const ref = db.collection('orders').doc(req.params.id);
-  const doc = await ref.get();
-  if (!doc.exists) return res.status(404).json({ error: 'Not found' });
+  const existing = await prisma.order.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  const history = (existing.statusHistory as any[]) ?? [];
   const now = new Date();
-  const history = (doc.data()!.statusHistory as any[]) ?? [];
-  await ref.update({
-    status: parsed.data.status,
-    trackingCode: parsed.data.trackingCode ?? doc.data()!.trackingCode ?? null,
-    statusHistory: [...history, { status: parsed.data.status, at: now }],
+  const updated = await prisma.order.update({
+    where: { id: req.params.id },
+    data: {
+      status: parsed.data.status,
+      trackingCode: parsed.data.trackingCode ?? existing.trackingCode ?? null,
+      statusHistory: [...history, { status: parsed.data.status, at: now.toISOString() }] as any,
+    },
+    include: { items: true },
   });
-  const updated = await ref.get();
-  res.json({ id: updated.id, ...updated.data() });
+  res.json(serialize(updated));
 });
 
 export default router;

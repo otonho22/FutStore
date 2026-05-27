@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { db } from '../firebase.js';
+import { prisma } from '../db.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -13,27 +13,28 @@ const profileSchema = z.object({
 router.post('/me', requireAuth, async (req: AuthedRequest, res) => {
   const parsed = profileSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const ref = db.collection('users').doc(req.user!.uid);
-  const existing = await ref.get();
-  const role = existing.exists ? existing.data()!.role : 'customer';
-  await ref.set(
-    {
-      email: req.user!.email ?? null,
+  const user = await prisma.user.upsert({
+    where: { id: req.user!.uid },
+    create: {
+      id: req.user!.uid,
+      email: req.user!.email ?? '',
       displayName: parsed.data.displayName,
       acceptedTerms: parsed.data.acceptedTerms,
-      role,
-      createdAt: existing.exists ? existing.data()!.createdAt : new Date(),
+      role: 'customer',
     },
-    { merge: true },
-  );
-  const doc = await ref.get();
-  res.json({ id: doc.id, ...doc.data() });
+    update: {
+      email: req.user!.email ?? undefined,
+      displayName: parsed.data.displayName,
+      acceptedTerms: parsed.data.acceptedTerms,
+    },
+  });
+  res.json(user);
 });
 
 router.get('/me', requireAuth, async (req: AuthedRequest, res) => {
-  const doc = await db.collection('users').doc(req.user!.uid).get();
-  if (!doc.exists) return res.status(404).json({ error: 'Not found' });
-  res.json({ id: doc.id, ...doc.data() });
+  const user = await prisma.user.findUnique({ where: { id: req.user!.uid } });
+  if (!user) return res.status(404).json({ error: 'Not found' });
+  res.json(user);
 });
 
 export default router;

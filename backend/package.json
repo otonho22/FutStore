@@ -5,12 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "lint": "eslint \"src/**/*.ts\" \"scripts/**/*.ts\"",
-    "set-admin": "tsx scripts/setAdmin.ts"
+    "prisma:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "set-admin": "tsx scripts/setAdmin.ts",
+    "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
+    "@prisma/client": "^5.20.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
@@ -24,6 +30,7 @@
     "@typescript-eslint/eslint-plugin": "^8.8.0",
     "@typescript-eslint/parser": "^8.8.0",
     "eslint": "^8.57.1",
+    "prisma": "^5.20.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"
   }

@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import { auth, db } from '../src/firebase.js';
+import { auth } from '../src/firebase.js';
+import { prisma } from '../src/db.js';
 
 const email = process.argv[2];
 if (!email) {
@@ -9,5 +10,17 @@ if (!email) {
 
 const user = await auth.getUserByEmail(email);
 await auth.setCustomUserClaims(user.uid, { role: 'admin' });
-await db.collection('users').doc(user.uid).set({ role: 'admin' }, { merge: true });
+
+await prisma.user.upsert({
+  where: { id: user.uid },
+  create: {
+    id: user.uid,
+    email: user.email ?? email,
+    displayName: user.displayName ?? null,
+    role: 'admin',
+  },
+  update: { role: 'admin' },
+});
+
 console.log(`OK: ${email} agora é admin. Peça para o usuário sair e entrar de novo.`);
+await prisma.$disconnect();

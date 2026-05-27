@@ -1,0 +1,115 @@
+// Schema do banco PostgreSQL — Projetinho Fellas
+// docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id // Firebase Auth UID
+  email         String   @unique
+  displayName   String?
+  role          String   @default("customer") // 'customer' | 'admin'
+  acceptedTerms Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  orders        Order[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  team        String
+  description String   @default("")
+  price       Float
+  imageUrl    String
+  images      String[] @default([])
+  category    String
+  salesCount  Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  sizes       ProductSize[]
+  orderItems  OrderItem[]
+
+  @@index([category])
+  @@index([active])
+  @@index([salesCount])
+}
+
+model ProductSize {
+  id        Int     @id @default(autoincrement())
+  productId String
+  size      String
+  stock     Int     @default(0)
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, size])
+}
+
+model Coupon {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  type       String   // 'fixed' | 'percent'
+  value      Float
+  validUntil DateTime
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+model Order {
+  id                String   @id @default(cuid())
+  userId            String
+  userEmail         String?
+  couponCode        String?
+  subtotal          Float
+  discount          Float    @default(0)
+  shipping          Float    @default(0)
+  total             Float
+  status            String   @default("pendente") // pendente | pago | enviado | entregue | cancelado
+  trackingCode      String?
+
+  // Endereço (denormalizado — snapshot do pedido)
+  addressFullName   String
+  addressStreet     String
+  addressNumber     String
+  addressComplement String?
+  addressCity       String
+  addressState      String
+  addressZip        String
+
+  // Histórico de status como JSON: [{ status: string, at: ISOString }, ...]
+  statusHistory     Json     @default("[]")
+
+  createdAt         DateTime @default(now())
+
+  user              User       @relation(fields: [userId], references: [id])
+  items             OrderItem[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   String
+  productId String
+  name      String  // snapshot
+  size      String
+  unitPrice Float   // snapshot do preço no momento da compra
+  quantity  Int
+  imageUrl  String?
+
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}

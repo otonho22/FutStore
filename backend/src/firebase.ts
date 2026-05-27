@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import { initializeApp, cert, applicationDefault, getApps } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -21,6 +20,4 @@ if (!getApps().length) {
   initializeApp({ credential: loadCredentials() });
 }
 
-export const db = getFirestore();
 export const auth = getAuth();
-export { FieldValue };

@@ -2,7 +2,7 @@
 
 MVP de e-commerce de camisas de futebol com autenticação, dashboard das mais vendidas, área de cliente, painel admin, cupons de desconto e pedidos rastreáveis. Tema escuro, sidebar intuitiva, mobile-first.
 
-Stack: **React + Vite + TypeScript** (frontend), **Node.js + Express + TypeScript** (backend), **Firestore** (banco) e **Firebase Auth** (autenticação).
+Stack: **React + Vite + TypeScript** (frontend), **Node.js + Express + TypeScript** (backend), **PostgreSQL** com **Prisma ORM** (banco) e **Firebase Auth** (autenticação — e-mail/senha + Google).
 
 ---
 
@@ -11,11 +11,12 @@ Stack: **React + Vite + TypeScript** (frontend), **Node.js + Express + TypeScrip
 - [Funcionalidades do MVP](#funcionalidades-do-mvp)
 - [Estrutura do repositório](#estrutura-do-repositório)
 - [Pré-requisitos](#pré-requisitos)
+- [Setup do PostgreSQL](#setup-do-postgresql)
 - [Setup do Firebase](#setup-do-firebase)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Rodando localmente](#rodando-localmente)
 - [Promovendo um usuário a admin](#promovendo-um-usuário-a-admin)
-- [Regras de segurança do Firestore](#regras-de-segurança-do-firestore)
+- [Modelo de dados (PostgreSQL)](#modelo-de-dados-postgresql)
 - [CI](#ci)
 - [Mapa RF → implementação](#mapa-rf--implementação)
 - [Fora do escopo / próximos passos](#fora-do-escopo--próximos-passos)
@@ -72,18 +73,64 @@ Stack: **React + Vite + TypeScript** (frontend), **Node.js + Express + TypeScrip
 
 - **Node.js 20+**
 - **npm 10+**
+- **PostgreSQL** 14+ (local, Docker, ou cloud — Neon/Supabase)
 - Conta no Firebase (plano Spark grátis basta para o MVP)
+
+---
+
+## Setup do PostgreSQL
+
+Você precisa de um Postgres rodando e da **connection string** (URL no formato `postgresql://USER:SENHA@HOST:PORTA/BANCO`). Três caminhos:
+
+### Opção A — Neon (cloud grátis, recomendado, zero instalação)
+
+1. Acesse <https://neon.tech> → **Sign up** (login com GitHub).
+2. **Create Project** → nome `projetinho-fellas` → região mais próxima → **Create**.
+3. Na tela inicial, copie a **Connection string** completa (algo como `postgresql://usuario:senha@ep-xxx.neon.tech/neondb?sslmode=require`).
+4. Cole essa string em `backend/.env` na variável `DATABASE_URL`.
+
+### Opção B — Docker (local, isolado)
+
+```bash
+docker run --name pf-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=projetinho_fellas -p 5432:5432 -d postgres:16
+```
+
+Use `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/projetinho_fellas?schema=public` no `backend/.env`.
+
+### Opção C — Postgres instalado local
+
+Baixe e instale do <https://www.postgresql.org/download/windows/>. Crie um banco `projetinho_fellas` via pgAdmin ou `psql`, ajuste a `DATABASE_URL`.
+
+### Após configurar
+
+Com `DATABASE_URL` preenchido em `backend/.env`, rode:
+
+```bash
+cd backend
+npx prisma migrate dev --name init
+```
+
+Isso cria todas as tabelas (`User`, `Product`, `ProductSize`, `Coupon`, `Order`, `OrderItem`) e gera o Prisma Client.
+
+Para inspecionar/editar dados visualmente:
+
+```bash
+npm run db:studio     # abre Prisma Studio em http://localhost:5555
+```
 
 ---
 
 ## Setup do Firebase
 
+Aqui o Firebase é usado **apenas para autenticação** (Auth + custom claims para role admin). Os dados do app ficam no PostgreSQL.
+
 1. Acesse <https://console.firebase.google.com> → **Adicionar projeto** → dê um nome qualquer (`projetinho-fellas`).
-2. No projeto criado, **Build → Authentication → Get started → Sign-in method → Email/Password → Enable**.
-3. **Build → Firestore Database → Create database → Production mode → escolha uma região (ex. `southamerica-east1`)**.
-4. **Project settings (⚙️) → General → Your apps → Web app (`</>`)** → registre um app (sem hosting). Copie o objeto `firebaseConfig` — ele vai no `.env` do frontend.
-5. **Project settings → Service accounts → Generate new private key**. Salve o JSON como `backend/serviceAccountKey.json` (não comite — já está no `.gitignore`).
-6. (Opcional) **Build → Firestore → Rules** → cole as [regras abaixo](#regras-de-segurança-do-firestore).
+2. **Build → Authentication → Get started → Sign-in method**:
+   - **Email/Password** → Enable → Save.
+   - **Google** → Enable → preencha "Project support email" → Save.
+3. **Project settings (⚙️) → General → Your apps → Web app (`</>`)** → registre um app (sem hosting). Copie o objeto `firebaseConfig` — ele vai no `.env` do frontend.
+4. **Project settings → Service accounts → Generate new private key**. Salve o JSON como `backend/serviceAccountKey.json` (não comite — já está no `.gitignore`).
+5. **Authentication → Settings → Authorized domains** — confirme que `localhost` está na lista.
 
 ---
 
@@ -110,7 +157,8 @@ Copie `backend/.env.example` para `backend/.env`:
 ```env
 PORT=4000
 GOOGLE_APPLICATION_CREDENTIALS=./serviceAccountKey.json
-ALLOWED_ORIGIN=http://localhost:5173
+DATABASE_URL=postgresql://USUARIO:SENHA@HOST:5432/projetinho_fellas?schema=public
+ALLOWED_ORIGIN=http://localhost:5173,http://localhost:5174,http://localhost:5175
 SHIPPING_FIXED=25
 ```
 
@@ -121,9 +169,11 @@ SHIPPING_FIXED=25
 **Opção 1 — atalhos da raiz** (recomendado):
 
 ```bash
-npm install              # instala deps da raiz (npm-run-all)
-npm run install:all      # instala backend e frontend
-npm run dev              # roda backend (:4000) e frontend (:5173) juntos
+npm install                              # instala deps da raiz (npm-run-all)
+npm run install:all                      # instala backend e frontend
+cd backend && npx prisma migrate dev     # cria as tabelas (só na primeira vez)
+cd ..
+npm run dev                              # roda backend (:4000) e frontend (:5173) juntos
 ```
 
 **Opção 2 — terminais separados**:
@@ -151,42 +201,23 @@ npm run set-admin -- seu-email@exemplo.com
 
 ---
 
-## Regras de segurança do Firestore
+## Modelo de dados (PostgreSQL)
 
-Cole em **Firestore → Rules**:
+O schema completo está em `backend/prisma/schema.prisma`. Tabelas:
 
+- `User` — `id` é o UID do Firebase Auth, com role `customer` ou `admin`.
+- `Product` + `ProductSize` (1:N) — cada produto tem N tamanhos com estoque.
+- `Coupon` — `code` único, tipo `fixed`|`percent`, validade.
+- `Order` + `OrderItem` (1:N) — endereço denormalizado, `statusHistory` como JSON.
+
+Comandos úteis (rodar de `backend/`):
+
+```bash
+npx prisma migrate dev      # criar migration em dev
+npm run db:deploy           # aplicar migrations em produção
+npm run db:studio           # GUI para inspecionar/editar dados
+npm run prisma:generate     # regerar o Prisma Client
 ```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    function isSignedIn() { return request.auth != null; }
-    function isAdmin() { return isSignedIn() && request.auth.token.role == 'admin'; }
-
-    match /users/{uid} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-      allow create: if isSignedIn() && request.auth.uid == uid;
-      allow update, delete: if isAdmin();
-    }
-
-    match /products/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /coupons/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    match /orders/{id} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create, update, delete: if isAdmin();
-    }
-  }
-}
-```
-
-> Pedidos são sempre criados pelo backend (com privilégios admin do service account), por isso `create` cliente está bloqueado.
 
 ---
 
@@ -213,7 +244,7 @@ Os PRs só devem ser mergeados se ambos os jobs passarem.
 | RF26/RF27/RF31/RF34/RF35 | Cupons fixo/percentual + validade + ativação + aplicação | `routes/coupons.ts`, `Cart.tsx`, `Checkout.tsx` |
 | RF51–RF54 | Área do cliente / listagem / detalhes / status | `MyOrders.tsx`, `OrderDetail.tsx` |
 | RF55/RF56 | Código de rastreio editável pelo admin | `AdminOrders.tsx` |
-| RF70 | Registro de vendas (contador `salesCount`) | `routes/orders.ts` via `FieldValue.increment()` |
+| RF70 | Registro de vendas (contador `salesCount`) | `routes/orders.ts` via Prisma transaction (`increment`) |
 | RF77/RF79 | Ranking decrescente + gráfico | `Dashboard.tsx` |
 | RNF01 | HTTPS | automático no deploy (Vercel/Render/Firebase Hosting) |
 | RNF02 | LGPD | checkbox "Aceito os termos" no signup |
