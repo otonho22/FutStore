@@ -1,4 +1,4 @@
-# Projetinho Fellas — Loja de Camisas de Futebol
+# FutStore— Loja de Camisas de Futebol
 
 MVP de e-commerce de camisas de futebol com autenticação, dashboard das mais vendidas, área de cliente, painel admin, cupons de desconto e pedidos rastreáveis. Tema escuro, sidebar intuitiva, mobile-first.
 
