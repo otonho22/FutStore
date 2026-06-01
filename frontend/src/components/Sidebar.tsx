@@ -20,7 +20,7 @@ const ICONS = {
 };
 
 export default function Sidebar() {
-  const { user, role, logout } = useAuth();
+  const { user, logout } = useAuth();
   const { items } = useCart();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -47,14 +47,7 @@ export default function Sidebar() {
             {cartCount > 0 && <span className="tag success" style={{ marginLeft: 'auto' }}>{cartCount}</span>}
           </NavLink>
           <NavLink to="/orders"><Icon d={ICONS.orders} /> Meus Pedidos</NavLink>
-          {role === 'admin' && (
-            <>
-              <div className="sep" />
-              <NavLink to="/admin/products"><Icon d={ICONS.admin} /> Produtos (admin)</NavLink>
-              <NavLink to="/admin/coupons"><Icon d={ICONS.admin} /> Cupons (admin)</NavLink>
-              <NavLink to="/admin/orders"><Icon d={ICONS.admin} /> Pedidos (admin)</NavLink>
-            </>
-          )}
+          {/* Admin desabilitado no modo local (sem backend) */}
         </nav>
         <div className="sidebar-foot">
           <div className="who">{user?.email}</div>
