@@ -1,4 +1,4 @@
-// Schema do banco PostgreSQL — Projetinho Fellas
+// Schema do banco PostgreSQL — FutStore
 // docs: https://pris.ly/d/prisma-schema
 
 generator client {

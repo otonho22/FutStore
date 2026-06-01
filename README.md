@@ -85,21 +85,21 @@ Você precisa de um Postgres rodando e da **connection string** (URL no formato 
 ### Opção A — Neon (cloud grátis, recomendado, zero instalação)
 
 1. Acesse <https://neon.tech> → **Sign up** (login com GitHub).
-2. **Create Project** → nome `projetinho-fellas` → região mais próxima → **Create**.
+2. **Create Project** → nome `futstore` → região mais próxima → **Create**.
 3. Na tela inicial, copie a **Connection string** completa (algo como `postgresql://usuario:senha@ep-xxx.neon.tech/neondb?sslmode=require`).
 4. Cole essa string em `backend/.env` na variável `DATABASE_URL`.
 
 ### Opção B — Docker (local, isolado)
 
 ```bash
-docker run --name pf-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=projetinho_fellas -p 5432:5432 -d postgres:16
+docker run --name pf-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=futstore -p 5432:5432 -d postgres:16
 ```
 
-Use `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/projetinho_fellas?schema=public` no `backend/.env`.
+Use `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/futstore?schema=public` no `backend/.env`.
 
 ### Opção C — Postgres instalado local
 
-Baixe e instale do <https://www.postgresql.org/download/windows/>. Crie um banco `projetinho_fellas` via pgAdmin ou `psql`, ajuste a `DATABASE_URL`.
+Baixe e instale do <https://www.postgresql.org/download/windows/>. Crie um banco `futstore` via pgAdmin ou `psql`, ajuste a `DATABASE_URL`.
 
 ### Após configurar
 
@@ -124,7 +124,7 @@ npm run db:studio     # abre Prisma Studio em http://localhost:5555
 
 Aqui o Firebase é usado **apenas para autenticação** (Auth + custom claims para role admin). Os dados do app ficam no PostgreSQL.
 
-1. Acesse <https://console.firebase.google.com> → **Adicionar projeto** → dê um nome qualquer (`projetinho-fellas`).
+1. Acesse <https://console.firebase.google.com> → **Adicionar projeto** → dê um nome qualquer (`futstore`).
 2. **Build → Authentication → Get started → Sign-in method**:
    - **Email/Password** → Enable → Save.
    - **Google** → Enable → preencha "Project support email" → Save.
@@ -157,7 +157,7 @@ Copie `backend/.env.example` para `backend/.env`:
 ```env
 PORT=4000
 GOOGLE_APPLICATION_CREDENTIALS=./serviceAccountKey.json
-DATABASE_URL=postgresql://USUARIO:SENHA@HOST:5432/projetinho_fellas?schema=public
+DATABASE_URL=postgresql://USUARIO:SENHA@HOST:5432/futstore?schema=public
 ALLOWED_ORIGIN=http://localhost:5173,http://localhost:5174,http://localhost:5175
 SHIPPING_FIXED=25
 ```
@@ -276,10 +276,10 @@ Para subir este repositório para o GitHub:
 git init
 git add .
 git commit -m "feat: MVP inicial — auth, catálogo, carrinho, cupons, pedidos, admin"
-gh repo create projetinho-fellas --public --source=. --push
+gh repo create futstore --public --source=. --push
 # OU, sem gh CLI:
 # crie o repo vazio em https://github.com/new
-# git remote add origin https://github.com/<seu-user>/projetinho-fellas.git
+# git remote add origin https://github.com/<seu-user>/futstore.git
 # git branch -M main
 # git push -u origin main
 ```

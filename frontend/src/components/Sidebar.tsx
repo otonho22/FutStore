@@ -38,7 +38,7 @@ export default function Sidebar() {
       <button className="menu-btn" onClick={() => setOpen(true)} aria-label="Menu">☰</button>
       <div className={`backdrop ${open ? 'open' : ''}`} onClick={close} />
       <aside className={`sidebar ${open ? 'open' : ''}`}>
-        <div className="sidebar-brand">⚽ Projetinho Fellas</div>
+        <div className="sidebar-brand">⚽ FutStore</div>
         <nav onClick={close}>
           <NavLink to="/" end><Icon d={ICONS.dash} /> Dashboard</NavLink>
           <NavLink to="/catalog"><Icon d={ICONS.cat} /> Catálogo</NavLink>

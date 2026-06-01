@@ -260,7 +260,7 @@ def build_chen_diagram():
 
 DDL_SQL = """\
 -- =============================================================================
--- Projetinho Fellas - DDL PostgreSQL (Modelo Fisico)
+-- FutStore - DDL PostgreSQL (Modelo Fisico)
 -- =============================================================================
 
 -- Tabela de usuarios (id e o UID do Firebase Auth)
@@ -374,7 +374,7 @@ CREATE INDEX "OrderItem_productId_idx" ON "OrderItem" ("productId");
 # =============================================================================
 
 INTRO_TEXT = """\
-Este documento apresenta a modelagem de dados completa do sistema <b>Projetinho Fellas</b>,
+Este documento apresenta a modelagem de dados completa do sistema <b>FutStore</b>,
 um e-commerce de camisas de futebol. A modelagem segue os tres niveis classicos
 de projeto de banco de dados:
 <br/><br/>
@@ -552,8 +552,8 @@ def build_pdf():
     doc = SimpleDocTemplate(str(PDF_PATH), pagesize=A4,
                             leftMargin=2.0 * cm, rightMargin=2.0 * cm,
                             topMargin=2.0 * cm, bottomMargin=2.0 * cm,
-                            title="Modelagem de Dados - Projetinho Fellas",
-                            author="Projetinho Fellas")
+                            title="Modelagem de Dados - FutStore",
+                            author="FutStore")
 
     story = []
 
@@ -563,7 +563,7 @@ def build_pdf():
     story.append(Spacer(1, 0.4 * cm))
     story.append(Paragraph("Conceitual &middot; Logico &middot; Fisico", subtitle_style))
     story.append(Spacer(1, 1.5 * cm))
-    story.append(Paragraph("<b>Projeto:</b> Projetinho Fellas - Loja de Camisas de Futebol",
+    story.append(Paragraph("<b>Projeto:</b> FutStore - Loja de Camisas de Futebol",
                            subtitle_style))
     story.append(Paragraph("<b>SGBD:</b> PostgreSQL 14+", subtitle_style))
     story.append(Paragraph("<b>ORM:</b> Prisma 5.x", subtitle_style))

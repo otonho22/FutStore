@@ -1,5 +1,5 @@
 {
-  "name": "projetinho-fellas",
+  "name": "futstore",
   "version": "0.1.0",
   "private": true,
   "description": "Loja de camisas de futebol — frontend React+Vite, backend Node+Express, Firestore.",
