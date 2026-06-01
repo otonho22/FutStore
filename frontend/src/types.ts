@@ -44,6 +44,15 @@ export interface Address {
 
 export type OrderStatus = 'pendente' | 'pago' | 'enviado' | 'entregue' | 'cancelado';
 
+export type PaymentMethod = 'credit_card' | 'pix' | 'boleto';
+
+export interface PaymentInfo {
+  method: PaymentMethod;
+  brand?: string;
+  last4?: string;
+  holderName?: string;
+}
+
 export interface Order {
   id: string;
   userId: string;
@@ -55,6 +64,7 @@ export interface Order {
   shipping: number;
   total: number;
   address: Address;
+  payment?: PaymentInfo;
   status: OrderStatus;
   statusHistory: { status: OrderStatus; at: any }[];
   trackingCode: string | null;

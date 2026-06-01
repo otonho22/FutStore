@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { api } from '../lib/api';
 import { brl } from '../lib/format';
+import QuickAdd from '../components/QuickAdd';
 import type { Product } from '../types';
 
 export default function Dashboard() {
@@ -75,17 +76,20 @@ export default function Dashboard() {
       ) : (
         <div className="product-grid">
           {products.map((p, idx) => (
-            <Link key={p.id} to={`/catalog/${p.id}`} className="card product-card" style={{ color: 'inherit' }}>
-              <div style={{ position: 'relative' }}>
-                <img src={p.imageUrl} alt={p.name} />
-                <span className="tag success" style={{ position: 'absolute', top: 8, left: 8 }}>
-                  #{idx + 1} • {p.salesCount ?? 0} vendas
-                </span>
-              </div>
-              <div className="name">{p.name}</div>
-              <div className="muted" style={{ fontSize: '0.85rem' }}>{p.team}</div>
-              <div className="price">{brl(p.price)}</div>
-            </Link>
+            <div key={p.id} className="card product-card">
+              <Link to={`/catalog/${p.id}`} style={{ color: 'inherit', display: 'block' }}>
+                <div style={{ position: 'relative' }}>
+                  <img src={p.imageUrl} alt={p.name} />
+                  <span className="tag success" style={{ position: 'absolute', top: 8, left: 8 }}>
+                    #{idx + 1} • {p.salesCount ?? 0} vendas
+                  </span>
+                </div>
+                <div className="name">{p.name}</div>
+                <div className="muted" style={{ fontSize: '0.85rem' }}>{p.team}</div>
+                <div className="price">{brl(p.price)}</div>
+              </Link>
+              <QuickAdd product={p} />
+            </div>
           ))}
         </div>
       )}

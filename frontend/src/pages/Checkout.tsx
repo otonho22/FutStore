@@ -3,9 +3,31 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { api } from '../lib/api';
 import { brl } from '../lib/format';
-import type { Coupon, Order, Address } from '../types';
+import type { Coupon, Order, Address, PaymentMethod } from '../types';
 
 const SHIPPING = 25;
+
+// Detecta bandeira pelos primeiros dígitos do cartão
+function detectBrand(num: string): string | undefined {
+  const n = num.replace(/\D/g, '');
+  if (/^4/.test(n)) return 'Visa';
+  if (/^(5[1-5]|2[2-7])/.test(n)) return 'Mastercard';
+  if (/^3[47]/.test(n)) return 'Amex';
+  if (/^(6011|65|64[4-9])/.test(n)) return 'Discover';
+  if (/^(606282|3841)/.test(n)) return 'Hipercard';
+  if (/^(4011|4312|4389|4514|4576|5041|5066|5067|509|6277|6362|6363|6504|6505|6507|6509|6516|6550)/.test(n))
+    return 'Elo';
+  return undefined;
+}
+
+function formatCardNumber(v: string) {
+  return v.replace(/\D/g, '').slice(0, 19).replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+
+function formatExpiry(v: string) {
+  const n = v.replace(/\D/g, '').slice(0, 4);
+  return n.length > 2 ? `${n.slice(0, 2)}/${n.slice(2)}` : n;
+}
 
 export default function Checkout() {
   const { items, subtotal, clear } = useCart();
@@ -16,6 +38,14 @@ export default function Checkout() {
   const [address, setAddress] = useState<Address>({
     fullName: '', street: '', number: '', complement: '', city: '', state: '', zip: '',
   });
+
+  // Pagamento
+  const [payMethod, setPayMethod] = useState<PaymentMethod>('credit_card');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,6 +53,7 @@ export default function Checkout() {
     ? 0
     : Math.min(subtotal, coupon.type === 'percent' ? subtotal * (coupon.value / 100) : coupon.value);
   const total = Math.max(0, subtotal - discount + SHIPPING);
+  const brand = detectBrand(cardNumber);
 
   async function validateCoupon() {
     if (!couponInput.trim()) return;
@@ -37,14 +68,32 @@ export default function Checkout() {
     }
   }
 
+  function buildPaymentPayload() {
+    if (payMethod === 'credit_card') {
+      const digits = cardNumber.replace(/\D/g, '');
+      if (digits.length < 13) throw new Error('Número do cartão inválido.');
+      if (!cardName.trim()) throw new Error('Informe o nome impresso no cartão.');
+      if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) throw new Error('Validade no formato MM/AA.');
+      if (!/^\d{3,4}$/.test(cardCvv)) throw new Error('CVV inválido.');
+      return {
+        method: 'credit_card' as const,
+        brand,
+        last4: digits.slice(-4),
+        holderName: cardName.trim(),
+      };
+    }
+    return { method: payMethod };
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
     try {
+      const payment = buildPaymentPayload();
       const order = await api<Order>('/api/orders', {
         method: 'POST',
-        body: JSON.stringify({ items, couponCode: coupon?.code, address }),
+        body: JSON.stringify({ items, couponCode: coupon?.code, address, payment }),
       });
       clear();
       navigate(`/orders/${order.id}`);
@@ -75,6 +124,7 @@ export default function Checkout() {
       <form onSubmit={onSubmit} className="grid"
         style={{ gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', alignItems: 'start' }}>
         <div className="col">
+          {/* Endereço */}
           <div className="card col">
             <h2 className="section-title" style={{ marginTop: 0 }}>Endereço de entrega</h2>
             <div><label>Nome completo</label>
@@ -97,6 +147,8 @@ export default function Checkout() {
                 <input required value={address.zip} onChange={(e) => set('zip', e.target.value)} /></div>
             </div>
           </div>
+
+          {/* Cupom */}
           <div className="card col">
             <h2 className="section-title" style={{ marginTop: 0 }}>Cupom</h2>
             <div className="row">
@@ -110,7 +162,85 @@ export default function Checkout() {
               </div>
             )}
           </div>
+
+          {/* Pagamento */}
+          <div className="card col">
+            <h2 className="section-title" style={{ marginTop: 0 }}>Forma de pagamento</h2>
+            <div className="pay-methods">
+              <PayOption value="credit_card" current={payMethod} onChange={setPayMethod}
+                icon="💳" title="Cartão de crédito" desc="Em até 12x" />
+              <PayOption value="pix" current={payMethod} onChange={setPayMethod}
+                icon="⚡" title="PIX" desc="5% de desconto, aprovação imediata" />
+              <PayOption value="boleto" current={payMethod} onChange={setPayMethod}
+                icon="📄" title="Boleto" desc="Aprovação em até 2 dias úteis" />
+            </div>
+
+            {payMethod === 'credit_card' && (
+              <div className="col" style={{ marginTop: '0.75rem' }}>
+                <div>
+                  <label>Número do cartão {brand && <span className="tag success">{brand}</span>}</label>
+                  <input value={cardNumber} placeholder="0000 0000 0000 0000"
+                    onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                    inputMode="numeric" autoComplete="cc-number" />
+                </div>
+                <div>
+                  <label>Nome impresso no cartão</label>
+                  <input value={cardName} placeholder="COMO ESTÁ NO CARTÃO"
+                    onChange={(e) => setCardName(e.target.value.toUpperCase())}
+                    autoComplete="cc-name" />
+                </div>
+                <div className="row">
+                  <div style={{ flex: 1 }}>
+                    <label>Validade (MM/AA)</label>
+                    <input value={cardExpiry} placeholder="MM/AA"
+                      onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
+                      inputMode="numeric" autoComplete="cc-exp" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label>CVV</label>
+                    <input value={cardCvv} placeholder="123" maxLength={4}
+                      onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, ''))}
+                      inputMode="numeric" autoComplete="cc-csc" />
+                  </div>
+                </div>
+                <p className="muted" style={{ fontSize: '0.8rem', margin: 0 }}>
+                  🔒 Dados simulados — apenas os últimos 4 dígitos são registrados no pedido.
+                </p>
+              </div>
+            )}
+
+            {payMethod === 'pix' && (
+              <div className="card" style={{ background: 'var(--bg-elev-2)', marginTop: '0.75rem' }}>
+                <div className="row" style={{ alignItems: 'flex-start' }}>
+                  <div style={{ width: 140, height: 140, background: '#fff', display: 'grid',
+                    placeItems: 'center', borderRadius: 8, color: '#000', fontSize: '0.7rem',
+                    textAlign: 'center', padding: '0.5rem' }}>
+                    QR Code<br />(simulado)
+                  </div>
+                  <div className="col" style={{ flex: 1 }}>
+                    <strong>Pix Copia e Cola</strong>
+                    <code style={{ fontSize: '0.78rem', background: 'var(--bg)', padding: '0.5rem',
+                      borderRadius: 6, wordBreak: 'break-all' }}>
+                      00020126360014BR.GOV.BCB.PIX0114projetinhofellas...
+                    </code>
+                    <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                      Após finalizar, escaneie o QR ou copie o código acima no seu app do banco.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {payMethod === 'boleto' && (
+              <div className="alert" style={{ marginTop: '0.75rem', marginBottom: 0 }}>
+                Ao finalizar, o boleto será gerado e enviado para seu e-mail. O pedido fica
+                como <strong>pendente</strong> até a compensação (1-2 dias úteis).
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Resumo */}
         <div className="card col">
           <h2 className="section-title" style={{ marginTop: 0 }}>Resumo</h2>
           {items.map((i) => (
@@ -119,7 +249,7 @@ export default function Checkout() {
               <span>{brl(i.unitPrice * i.quantity)}</span>
             </div>
           ))}
-          <div className="sep" style={{ height: 1, background: 'var(--border)', margin: '0.25rem 0' }} />
+          <div style={{ height: 1, background: 'var(--border)', margin: '0.25rem 0' }} />
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <span className="muted">Subtotal</span><span>{brl(subtotal)}</span>
           </div>
@@ -138,5 +268,29 @@ export default function Checkout() {
         </div>
       </form>
     </div>
+  );
+}
+
+function PayOption({
+  value, current, onChange, icon, title, desc,
+}: {
+  value: PaymentMethod;
+  current: PaymentMethod;
+  onChange: (m: PaymentMethod) => void;
+  icon: string;
+  title: string;
+  desc: string;
+}) {
+  const selected = current === value;
+  return (
+    <label className={`pay-opt ${selected ? 'selected' : ''}`}>
+      <input type="radio" name="paymethod" value={value}
+        checked={selected} onChange={() => onChange(value)} style={{ display: 'none' }} />
+      <span style={{ fontSize: '1.4rem' }}>{icon}</span>
+      <div className="col" style={{ gap: 2 }}>
+        <strong>{title}</strong>
+        <span className="muted" style={{ fontSize: '0.78rem' }}>{desc}</span>
+      </div>
+    </label>
   );
 }

@@ -24,10 +24,21 @@ const addressSchema = z.object({
   zip: z.string().min(8),
 });
 
+const paymentSchema = z.object({
+  method: z.enum(['credit_card', 'pix', 'boleto']),
+  brand: z.string().optional(),
+  last4: z.string().regex(/^\d{4}$/).optional(),
+  holderName: z.string().optional(),
+}).refine(
+  (p) => p.method !== 'credit_card' || (!!p.last4 && !!p.holderName),
+  { message: 'Cartão exige last4 e holderName' },
+);
+
 const orderSchema = z.object({
   items: z.array(itemSchema).min(1),
   couponCode: z.string().optional(),
   address: addressSchema,
+  payment: paymentSchema,
 });
 
 const statusSchema = z.object({
@@ -68,13 +79,19 @@ function serialize(o: any) {
       state: o.addressState,
       zip: o.addressZip,
     },
+    payment: {
+      method: o.paymentMethod,
+      brand: o.paymentBrand ?? undefined,
+      last4: o.paymentLast4 ?? undefined,
+      holderName: o.paymentHolderName ?? undefined,
+    },
   };
 }
 
 router.post('/', requireAuth, async (req: AuthedRequest, res) => {
   const parsed = orderSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { items, couponCode, address } = parsed.data;
+  const { items, couponCode, address, payment } = parsed.data;
 
   try {
     const created = await prisma.$transaction(async (tx) => {
@@ -156,6 +173,10 @@ router.post('/', requireAuth, async (req: AuthedRequest, res) => {
           addressCity: address.city,
           addressState: address.state,
           addressZip: address.zip,
+          paymentMethod: payment.method,
+          paymentBrand: payment.brand ?? null,
+          paymentLast4: payment.last4 ?? null,
+          paymentHolderName: payment.holderName ?? null,
           items: {
             create: items.map((i) => ({
               productId: i.productId,

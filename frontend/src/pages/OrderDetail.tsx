@@ -69,6 +69,24 @@ export default function OrderDetail() {
               {order.address.city} / {order.address.state} — {order.address.zip}
             </div>
           </div>
+          {order.payment && (
+            <div className="card col">
+              <h2 className="section-title" style={{ marginTop: 0 }}>Pagamento</h2>
+              {order.payment.method === 'credit_card' && (
+                <div className="col">
+                  <strong>💳 Cartão de crédito{order.payment.brand ? ` · ${order.payment.brand}` : ''}</strong>
+                  <span className="muted">
+                    •••• •••• •••• {order.payment.last4 ?? '----'}
+                  </span>
+                  {order.payment.holderName && (
+                    <span className="muted">{order.payment.holderName}</span>
+                  )}
+                </div>
+              )}
+              {order.payment.method === 'pix' && <strong>⚡ PIX</strong>}
+              {order.payment.method === 'boleto' && <strong>📄 Boleto bancário</strong>}
+            </div>
+          )}
           <div className="card col">
             <h2 className="section-title" style={{ marginTop: 0 }}>Totais</h2>
             <div className="row" style={{ justifyContent: 'space-between' }}>

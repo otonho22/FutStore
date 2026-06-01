@@ -75,6 +75,12 @@ model Order {
   status            String   @default("pendente") // pendente | pago | enviado | entregue | cancelado
   trackingCode      String?
 
+  // Pagamento
+  paymentMethod     String   @default("credit_card") // 'credit_card' | 'pix' | 'boleto'
+  paymentBrand      String?  // 'Visa' | 'Mastercard' | etc (apenas cartão)
+  paymentLast4      String?  // últimos 4 dígitos (apenas cartão)
+  paymentHolderName String?  // nome no cartão (apenas cartão)
+
   // Endereço (denormalizado — snapshot do pedido)
   addressFullName   String
   addressStreet     String
