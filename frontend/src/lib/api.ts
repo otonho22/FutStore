@@ -37,14 +37,28 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   const data = text ? safeJson(text) : null;
 
   if (!res.ok) {
-    const message =
-      (data && typeof data === 'object' && 'error' in data && typeof data.error === 'string'
-        ? data.error
-        : null) ?? `HTTP ${res.status}`;
-    throw new Error(message);
+    throw new Error(extractError(data) ?? `HTTP ${res.status}`);
   }
 
   return data as T;
+}
+
+// Backend devolve `{ error: string }` ou `{ error: ZodFlatten }`. Esta função
+// transforma ambos em uma mensagem legível pro alert do checkout/admin.
+function extractError(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const err = (data as { error?: unknown }).error;
+  if (typeof err === 'string') return err;
+  if (err && typeof err === 'object') {
+    const flat = err as { formErrors?: string[]; fieldErrors?: Record<string, string[]> };
+    const fieldMsgs = flat.fieldErrors
+      ? Object.entries(flat.fieldErrors)
+          .flatMap(([field, msgs]) => (msgs ?? []).map((m) => `${field}: ${m}`))
+      : [];
+    const all = [...(flat.formErrors ?? []), ...fieldMsgs];
+    if (all.length > 0) return all.join(' · ');
+  }
+  return null;
 }
 
 function safeJson(text: string): unknown {

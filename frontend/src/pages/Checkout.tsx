@@ -1,9 +1,15 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import QRCode from 'qrcode';
 import { useCart } from '../context/CartContext';
 import { api } from '../lib/api';
 import { brl } from '../lib/format';
+import { buildPixPayload } from '../lib/pix';
 import type { Coupon, Order, Address, PaymentMethod } from '../types';
+
+const PIX_KEY = import.meta.env.VITE_PIX_KEY as string | undefined;
+const PIX_NAME = import.meta.env.VITE_PIX_NAME as string | undefined;
+const PIX_CITY = import.meta.env.VITE_PIX_CITY as string | undefined;
 
 const SHIPPING = 25;
 
@@ -48,12 +54,47 @@ export default function Checkout() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pixCopied, setPixCopied] = useState(false);
+  const pixCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const discount = !coupon
     ? 0
     : Math.min(subtotal, coupon.type === 'percent' ? subtotal * (coupon.value / 100) : coupon.value);
   const total = Math.max(0, subtotal - discount + SHIPPING);
   const brand = detectBrand(cardNumber);
+
+  // Payload do BR Code Pix — recalculado quando muda o total.
+  const pixPayload = useMemo(() => {
+    if (!PIX_KEY || !PIX_NAME || !PIX_CITY || total <= 0) return null;
+    return buildPixPayload({
+      key: PIX_KEY,
+      name: PIX_NAME,
+      city: PIX_CITY,
+      amount: Number(total.toFixed(2)),
+      txid: `FUTSTORE${Date.now().toString().slice(-10)}`,
+    });
+  }, [total]);
+
+  // Renderiza QR no canvas quando o PIX está selecionado e o payload existe.
+  useEffect(() => {
+    if (payMethod !== 'pix' || !pixPayload || !pixCanvasRef.current) return;
+    QRCode.toCanvas(pixCanvasRef.current, pixPayload, {
+      width: 200,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+    }).catch(() => {});
+  }, [payMethod, pixPayload]);
+
+  async function copyPix() {
+    if (!pixPayload) return;
+    try {
+      await navigator.clipboard.writeText(pixPayload);
+      setPixCopied(true);
+      setTimeout(() => setPixCopied(false), 2000);
+    } catch {
+      // clipboard pode falhar em http (não-localhost) — silencioso
+    }
+  }
 
   async function validateCoupon() {
     if (!couponInput.trim()) return;
@@ -211,23 +252,45 @@ export default function Checkout() {
 
             {payMethod === 'pix' && (
               <div className="card" style={{ background: 'var(--bg-elev-2)', marginTop: '0.75rem' }}>
-                <div className="row" style={{ alignItems: 'flex-start' }}>
-                  <div style={{ width: 140, height: 140, background: '#fff', display: 'grid',
-                    placeItems: 'center', borderRadius: 8, color: '#000', fontSize: '0.7rem',
-                    textAlign: 'center', padding: '0.5rem' }}>
-                    QR Code<br />(simulado)
+                {!pixPayload ? (
+                  <div className="alert error" style={{ margin: 0 }}>
+                    Pix indisponível — defina <code>VITE_PIX_KEY</code>, <code>VITE_PIX_NAME</code> e
+                    <code> VITE_PIX_CITY</code> no <code>.env</code> do frontend.
                   </div>
-                  <div className="col" style={{ flex: 1 }}>
-                    <strong>Pix Copia e Cola</strong>
-                    <code style={{ fontSize: '0.78rem', background: 'var(--bg)', padding: '0.5rem',
-                      borderRadius: 6, wordBreak: 'break-all' }}>
-                      00020126360014BR.GOV.BCB.PIX0114projetinhofellas...
-                    </code>
-                    <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                      Após finalizar, escaneie o QR ou copie o código acima no seu app do banco.
-                    </p>
+                ) : (
+                  <div className="row" style={{ alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+                    <div style={{ background: '#fff', padding: 10, borderRadius: 8, display: 'grid',
+                      placeItems: 'center' }}>
+                      <canvas ref={pixCanvasRef} />
+                    </div>
+                    <div className="col" style={{ flex: 1, minWidth: 220 }}>
+                      <div>
+                        <strong>Recebedor</strong>
+                        <div className="muted" style={{ fontSize: '0.85rem' }}>
+                          {PIX_NAME} · {PIX_CITY}
+                        </div>
+                      </div>
+                      <div>
+                        <strong>Valor</strong>
+                        <div style={{ fontSize: '1.1rem', color: 'var(--primary)' }}>{brl(total)}</div>
+                      </div>
+                      <div>
+                        <strong>Pix Copia e Cola</strong>
+                        <code style={{ fontSize: '0.72rem', background: 'var(--bg)', padding: '0.5rem',
+                          borderRadius: 6, wordBreak: 'break-all', display: 'block', marginTop: 4 }}>
+                          {pixPayload}
+                        </code>
+                      </div>
+                      <button type="button" onClick={copyPix}>
+                        {pixCopied ? '✓ Copiado!' : '📋 Copiar código Pix'}
+                      </button>
+                      <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                        Escaneie o QR no app do banco ou cole o código acima. Após pagar,
+                        clique em <strong>Finalizar pedido</strong> — a confirmação é manual.
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 

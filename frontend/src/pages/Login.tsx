@@ -31,18 +31,6 @@ export default function Login() {
         <h1 style={{ margin: 0 }}>⚽ Entrar</h1>
         <p className="muted" style={{ marginTop: 0 }}>Bem-vindo de volta.</p>
 
-        <div
-          className="alert"
-          style={{
-            background: 'rgba(251, 191, 36, 0.08)',
-            border: '1px solid rgba(251, 191, 36, 0.35)',
-            color: '#fbbf24',
-            fontSize: '0.85rem',
-          }}
-        >
-          🔐 <strong>Acesso administrador padrão:</strong> usuário <code>adm</code> · senha <code>adm123</code>
-        </div>
-
         {error && <div className="alert error">{error}</div>}
         <div>
           <label>Usuário ou e-mail</label>
@@ -52,7 +40,7 @@ export default function Login() {
             required
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            placeholder="adm ou seu@email.com"
+            placeholder="seu@email.com"
           />
         </div>
         <div>

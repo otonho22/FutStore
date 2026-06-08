@@ -12,12 +12,23 @@ type Props = {
 };
 
 const TEAM_COLOR: Record<string, string> = {
-  // Clubes
+  // Clubes brasileiros
   Flamengo: 'ef4444',
   Palmeiras: '22c55e',
   Corinthians: 'f9fafb',
   'São Paulo': 'ef4444',
   Grêmio: '38bdf8',
+  Vasco: '111827',
+  Santos: 'f9fafb',
+  Internacional: 'dc2626',
+  'Atlético-MG': '111827',
+  Fluminense: '7c1d6f',
+  Botafogo: '111827',
+  Cruzeiro: '1d4ed8',
+  Bahia: '1e40af',
+  Fortaleza: '1e3a8a',
+  Sport: 'dc2626',
+  // Clubes internacionais
   'Real Madrid': 'f1f5f9',
   'FC Barcelona': 'ef4444',
   'Manchester City': '38bdf8',
@@ -82,6 +93,8 @@ const TEAM_COLOR: Record<string, string> = {
 
 const TEAM_INITIALS: Record<string, string> = {
   Flamengo: 'FLA', Palmeiras: 'PAL', Corinthians: 'COR', 'São Paulo': 'SAO', Grêmio: 'GRE',
+  Vasco: 'VAS', Santos: 'SAN', Internacional: 'INT', 'Atlético-MG': 'CAM',
+  Fluminense: 'FLU', Botafogo: 'BOT', Cruzeiro: 'CRU', Bahia: 'BAH', Fortaleza: 'FOR', Sport: 'SPO',
   'Real Madrid': 'RMA', 'FC Barcelona': 'BAR', 'Manchester City': 'MCI',
   'Seleção Brasileira': 'BRA', 'Seleção Argentina': 'ARG',
   // Copa 2026 (códigos FIFA)

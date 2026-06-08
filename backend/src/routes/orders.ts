@@ -5,13 +5,20 @@ import { requireAuth, requireAdmin, type AuthedRequest } from '../middleware/aut
 
 const router = Router();
 
+// Aceita URL absoluta (http/https) ou path absoluto (/jerseys/...) — mesma
+// regra usada em products.ts pra imagens locais servidas pelo frontend.
+const imageRef = z.string().min(1).refine(
+  (s) => s.startsWith('/') || /^https?:\/\//.test(s),
+  { message: 'Deve ser URL http(s) ou caminho começando com /' },
+);
+
 const itemSchema = z.object({
   productId: z.string().min(1),
   name: z.string().min(1),
   size: z.string().min(1),
   unitPrice: z.number().positive(),
   quantity: z.number().int().positive(),
-  imageUrl: z.string().url().optional(),
+  imageUrl: imageRef.optional(),
 });
 
 const addressSchema = z.object({
