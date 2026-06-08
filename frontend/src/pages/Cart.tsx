@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { brl } from '../lib/format';
+import JerseyImage from '../components/JerseyImage';
 
 export default function Cart() {
   const { items, remove, setQuantity, subtotal } = useCart();
@@ -37,7 +38,7 @@ export default function Cart() {
               <tr key={`${i.productId}-${i.size}`}>
                 <td>
                   <div className="row" style={{ gap: '0.75rem' }}>
-                    {i.imageUrl && <img src={i.imageUrl} alt="" style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }} />}
+                    <JerseyImage imageUrl={i.imageUrl} name={i.name} size={48} />
                     <span>{i.name}</span>
                   </div>
                 </td>

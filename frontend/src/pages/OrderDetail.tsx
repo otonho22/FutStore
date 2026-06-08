@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { brl, formatDate } from '../lib/format';
+import { downloadNfPdf } from '../lib/nfe';
 import type { Order } from '../types';
 
 const statusClass: Record<string, string> = {
@@ -28,6 +29,7 @@ export default function OrderDetail() {
       <div className="row" style={{ marginBottom: '1rem' }}>
         <span className={`tag ${statusClass[order.status]}`}>{order.status}</span>
         {order.trackingCode && <span className="tag">Rastreio: {order.trackingCode}</span>}
+        <button onClick={() => downloadNfPdf(order)}>📄 Baixar Nota Fiscal (PDF) — simulada</button>
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', alignItems: 'start' }}>

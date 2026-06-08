@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { brl, formatDate } from '../lib/format';
+import { downloadNfPdf } from '../lib/nfe';
 import type { Order } from '../types';
 
 const statusClass: Record<string, string> = {
@@ -38,7 +39,12 @@ export default function MyOrders() {
                     <td>{o.items.reduce((s, i) => s + i.quantity, 0)}</td>
                     <td>{brl(o.total)}</td>
                     <td><span className={`tag ${statusClass[o.status]}`}>{o.status}</span></td>
-                    <td><Link to={`/orders/${o.id}`}>Detalhes</Link></td>
+                    <td>
+                      <div className="row" style={{ gap: 6 }}>
+                        <Link to={`/orders/${o.id}`}>Detalhes</Link>
+                        <button onClick={() => downloadNfPdf(o)} title="Baixar Nota Fiscal (simulada)">📄 NF</button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

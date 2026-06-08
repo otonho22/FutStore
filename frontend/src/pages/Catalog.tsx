@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { brl } from '../lib/format';
 import QuickAdd from '../components/QuickAdd';
+import JerseyImage from '../components/JerseyImage';
 import type { Product } from '../types';
 
 export default function Catalog() {
@@ -42,7 +43,7 @@ export default function Catalog() {
           {filtered.map((p) => (
             <div key={p.id} className="card product-card">
               <Link to={`/catalog/${p.id}`} style={{ color: 'inherit', display: 'block' }}>
-                <img src={p.imageUrl} alt={p.name} />
+                <JerseyImage imageUrl={p.imageUrl} team={p.team} name={p.name} alt={p.name} />
                 <div className="name">{p.name}</div>
                 <div className="muted" style={{ fontSize: '0.85rem' }}>{p.team}</div>
                 <div className="price">{brl(p.price)}</div>

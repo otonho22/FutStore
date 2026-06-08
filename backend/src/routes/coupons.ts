@@ -11,6 +11,9 @@ const couponSchema = z.object({
   value: z.number().positive(),
   validUntil: z.string().datetime().or(z.string().date()),
   active: z.boolean().default(true),
+  firstPurchaseOnly: z.boolean().default(false),
+  maxUsesPerCustomer: z.number().int().positive().nullable().optional(),
+  maxUsesGlobal: z.number().int().positive().nullable().optional(),
 });
 
 router.get('/', requireAuth, requireAdmin, async (_req, res) => {
@@ -18,12 +21,31 @@ router.get('/', requireAuth, requireAdmin, async (_req, res) => {
   res.json(coupons);
 });
 
-router.get('/validate/:code', requireAuth, async (req, res) => {
+router.get('/validate/:code', requireAuth, async (req: AuthedRequest, res) => {
   const code = req.params.code.toUpperCase();
   const coupon = await prisma.coupon.findUnique({ where: { code } });
   if (!coupon) return res.status(404).json({ error: 'Cupom não encontrado' });
   if (!coupon.active) return res.status(400).json({ error: 'Cupom inativo' });
   if (coupon.validUntil < new Date()) return res.status(400).json({ error: 'Cupom expirado' });
+
+  const userId = req.user!.uid;
+  const notCancelled = { status: { not: 'cancelado' } as const };
+
+  if (coupon.firstPurchaseOnly) {
+    const prev = await prisma.order.count({ where: { userId, ...notCancelled } });
+    if (prev > 0) return res.status(400).json({ error: 'Cupom válido apenas na primeira compra' });
+  }
+  if (coupon.maxUsesGlobal != null) {
+    const used = await prisma.order.count({ where: { couponCode: code, ...notCancelled } });
+    if (used >= coupon.maxUsesGlobal) return res.status(400).json({ error: 'Cupom esgotado' });
+  }
+  if (coupon.maxUsesPerCustomer != null) {
+    const usedByUser = await prisma.order.count({ where: { couponCode: code, userId, ...notCancelled } });
+    if (usedByUser >= coupon.maxUsesPerCustomer) {
+      return res.status(400).json({ error: 'Limite de uso por cliente atingido' });
+    }
+  }
+
   res.json(coupon);
 });
 
