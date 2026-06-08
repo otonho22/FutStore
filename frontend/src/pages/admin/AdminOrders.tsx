@@ -20,9 +20,30 @@ export default function AdminOrders() {
   useEffect(() => { refresh(); }, []);
 
   async function update(o: Order, status: OrderStatus) {
-    const trackingCode = status === 'enviado'
-      ? prompt('Código de rastreio (opcional):', o.trackingCode ?? '') ?? undefined
-      : undefined;
+    let trackingCode: string | undefined = undefined;
+
+    if (status === 'enviado') {
+      // Código de rastreio é obrigatório quando muda pra "enviado". Sem ele
+      // o e-mail enviado ao cliente não tem o link dos Correios e a tela de
+      // rastreio fica sem informação útil. Cancelar/vazio aborta a operação.
+      const raw = prompt(
+        'Código de rastreio dos Correios (obrigatório):\nEx.: AA123456789BR',
+        o.trackingCode ?? '',
+      );
+      if (raw == null) {
+        alert('Mudança de status cancelada.\nPara marcar como "enviado" é preciso informar o código de rastreio.');
+        await refresh(); // re-renderiza o select pra voltar pro status anterior
+        return;
+      }
+      const cleaned = raw.trim();
+      if (cleaned.length < 8) {
+        alert('Código de rastreio inválido. Use o formato dos Correios (ex.: AA123456789BR).');
+        await refresh();
+        return;
+      }
+      trackingCode = cleaned;
+    }
+
     await api(`/api/orders/${o.id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status, trackingCode }),

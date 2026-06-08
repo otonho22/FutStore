@@ -5,6 +5,7 @@ import productsRouter from './routes/products.js';
 import couponsRouter from './routes/coupons.js';
 import ordersRouter from './routes/orders.js';
 import usersRouter from './routes/users.js';
+import { verifyMailerConfig } from './lib/mailer.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -39,4 +40,6 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 app.listen(port, () => {
   console.log(`API ready on http://localhost:${port}`);
+  // Valida SMTP em background — não bloqueia o boot.
+  void verifyMailerConfig();
 });

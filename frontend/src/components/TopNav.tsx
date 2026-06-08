@@ -60,7 +60,7 @@ export default function TopNav() {
             {!user && (
               <Link className="util-cta" to="/login">Entrar</Link>
             )}
-            <a className="util-link" href="#">Acompanhar pedido</a>
+            <Link className="util-link" to="/track">Acompanhar pedido</Link>
             {isAdmin && (
               <>
                 <NavLink className="util-link" to="/admin/products">Admin · Produtos</NavLink>

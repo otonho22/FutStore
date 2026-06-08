@@ -13,6 +13,7 @@ import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import MyOrders from './pages/MyOrders';
 import OrderDetail from './pages/OrderDetail';
+import Track from './pages/Track';
 import AdminProducts from './pages/admin/AdminProducts';
 import AdminCoupons from './pages/admin/AdminCoupons';
 import AdminOrders from './pages/admin/AdminOrders';
@@ -32,6 +33,8 @@ export default function App() {
               <Route path="copa-2026" element={<Copa2026 />} />
               <Route path="catalog/:id" element={<ProductDetail />} />
               <Route path="cart" element={<Cart />} />
+              <Route path="track" element={<Track />} />
+              <Route path="track/:code" element={<Track />} />
 
               {/* Rotas que dependem de usuário autenticado */}
               <Route element={<ProtectedRoute />}>
