@@ -25,21 +25,26 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            <Route element={<ProtectedRoute />}>
-              <Route element={<Layout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="catalog" element={<Catalog />} />
-                <Route path="copa-2026" element={<Copa2026 />} />
-                <Route path="catalog/:id" element={<ProductDetail />} />
-                <Route path="cart" element={<Cart />} />
+            <Route element={<Layout />}>
+              {/* Rotas públicas — qualquer visitante acessa sem login */}
+              <Route index element={<Dashboard />} />
+              <Route path="catalog" element={<Catalog />} />
+              <Route path="copa-2026" element={<Copa2026 />} />
+              <Route path="catalog/:id" element={<ProductDetail />} />
+              <Route path="cart" element={<Cart />} />
+
+              {/* Rotas que dependem de usuário autenticado */}
+              <Route element={<ProtectedRoute />}>
                 <Route path="checkout" element={<Checkout />} />
                 <Route path="orders" element={<MyOrders />} />
                 <Route path="orders/:id" element={<OrderDetail />} />
-                <Route element={<AdminRoute />}>
-                  <Route path="admin/products" element={<AdminProducts />} />
-                  <Route path="admin/coupons" element={<AdminCoupons />} />
-                  <Route path="admin/orders" element={<AdminOrders />} />
-                </Route>
+              </Route>
+
+              {/* Rotas exclusivas do admin */}
+              <Route element={<AdminRoute />}>
+                <Route path="admin/products" element={<AdminProducts />} />
+                <Route path="admin/coupons" element={<AdminCoupons />} />
+                <Route path="admin/orders" element={<AdminOrders />} />
               </Route>
             </Route>
           </Routes>

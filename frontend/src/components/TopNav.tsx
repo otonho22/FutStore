@@ -57,6 +57,9 @@ export default function TopNav() {
           </div>
           <div className="util-right">
             <a className="util-link" href="#">Ajuda</a>
+            {!user && (
+              <Link className="util-cta" to="/login">Entrar</Link>
+            )}
             <a className="util-link" href="#">Acompanhar pedido</a>
             {isAdmin && (
               <>
@@ -65,10 +68,8 @@ export default function TopNav() {
                 <NavLink className="util-link" to="/admin/orders">Pedidos</NavLink>
               </>
             )}
-            {user ? (
+            {user && (
               <button className="util-link util-btn" onClick={handleLogout}>Sair</button>
-            ) : (
-              <Link className="util-link" to="/login">Entrar</Link>
             )}
           </div>
         </div>

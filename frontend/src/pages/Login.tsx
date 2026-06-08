@@ -6,7 +6,7 @@ import GoogleButton from '../components/GoogleButton';
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -16,7 +16,7 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      await login(email, password);
+      await login(identifier, password);
       navigate('/');
     } catch (e: any) {
       setError(e.message ?? 'Erro ao entrar');
@@ -30,11 +30,30 @@ export default function Login() {
       <form className="card auth-card col" onSubmit={onSubmit}>
         <h1 style={{ margin: 0 }}>⚽ Entrar</h1>
         <p className="muted" style={{ marginTop: 0 }}>Bem-vindo de volta.</p>
+
+        <div
+          className="alert"
+          style={{
+            background: 'rgba(251, 191, 36, 0.08)',
+            border: '1px solid rgba(251, 191, 36, 0.35)',
+            color: '#fbbf24',
+            fontSize: '0.85rem',
+          }}
+        >
+          🔐 <strong>Acesso administrador padrão:</strong> usuário <code>adm</code> · senha <code>adm123</code>
+        </div>
+
         {error && <div className="alert error">{error}</div>}
         <div>
-          <label>E-mail</label>
-          <input type="email" autoComplete="email" required value={email}
-            onChange={(e) => setEmail(e.target.value)} />
+          <label>Usuário ou e-mail</label>
+          <input
+            type="text"
+            autoComplete="username"
+            required
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="adm ou seu@email.com"
+          />
         </div>
         <div>
           <label>Senha</label>

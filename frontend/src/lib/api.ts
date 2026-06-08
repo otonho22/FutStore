@@ -1,8 +1,21 @@
 import { auth } from './firebase';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+const LOCAL_ADMIN_KEY = 'pf_local_admin_v1';
+const LOCAL_ADMIN_TOKEN = 'adm-adm123';
+
+function hasLocalAdmin(): boolean {
+  try {
+    return !!localStorage.getItem(LOCAL_ADMIN_KEY);
+  } catch {
+    return false;
+  }
+}
 
 async function authHeader(): Promise<Record<string, string>> {
+  if (hasLocalAdmin()) {
+    return { 'X-Local-Admin': LOCAL_ADMIN_TOKEN };
+  }
   const user = auth.currentUser;
   if (!user) return {};
   const token = await user.getIdToken();
