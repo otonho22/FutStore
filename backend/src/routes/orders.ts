@@ -2,6 +2,37 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { requireAuth, requireAdmin, type AuthedRequest } from '../middleware/auth.js';
+import { sendMail } from '../lib/mailer.js';
+import {
+  orderConfirmationEmail,
+  orderPaidEmail,
+  orderShippedEmail,
+  orderDeliveredEmail,
+  type OrderEmailData,
+} from '../lib/mail-templates.js';
+
+const APP_URL = process.env.APP_URL ?? 'http://localhost:5173';
+
+type EmailableStatus = 'pendente' | 'pago' | 'enviado' | 'entregue';
+
+// Dispara o e-mail correspondente ao estado atual do pedido. Fire-and-forget:
+// erros são engolidos pelo próprio mailer — pedido nunca quebra por causa
+// de e-mail (se SMTP cair, internet cair, senha errar, etc.).
+function emailForStatus(status: EmailableStatus, data: OrderEmailData) {
+  switch (status) {
+    case 'pendente': return orderConfirmationEmail(data, APP_URL);
+    case 'pago':     return orderPaidEmail(data, APP_URL);
+    case 'enviado':  return orderShippedEmail(data, APP_URL);
+    case 'entregue': return orderDeliveredEmail(data, APP_URL);
+  }
+}
+
+function fireOrderEmail(to: string | null | undefined, status: EmailableStatus, data: OrderEmailData) {
+  if (!to) return; // pedido sem e-mail do comprador (admin local, p.ex.) — não tenta enviar
+  const { subject, html } = emailForStatus(status, data);
+  // .catch é redundante (mailer já trata) mas garante que nenhum reject vaze.
+  sendMail({ to, subject, html }).catch((e) => console.error('[mailer] unhandled:', e?.message));
+}
 
 const router = Router();
 
@@ -217,6 +248,18 @@ router.post('/', requireAuth, async (req: AuthedRequest, res) => {
       return order;
     });
 
+    // Dispara e-mail de "Pedido recebido" — fire-and-forget, não bloqueia o response.
+    fireOrderEmail(created.userEmail, 'pendente', {
+      id: created.id,
+      customerName: created.addressFullName,
+      items: created.items.map((i) => ({
+        name: i.name, size: i.size, quantity: i.quantity, unitPrice: i.unitPrice,
+      })),
+      total: created.total,
+      city: created.addressCity,
+      state: created.addressState,
+    });
+
     res.status(201).json(serialize(created));
   } catch (e: any) {
     res.status(400).json({ error: e.message ?? 'Erro ao criar pedido' });
@@ -284,6 +327,45 @@ router.get('/bi/summary', requireAuth, requireAdmin, async (req, res) => {
   });
 });
 
+// Rastreio público — qualquer um com o ID do pedido OU o código de rastreio
+// dos Correios pode consultar. Retorna versão "magra" do pedido: sem totais,
+// pagamento, e-mail do comprador, rua/número/CEP. Mostra só o que faz sentido
+// pra tela de rastreamento: status, histórico, itens, cidade/UF de entrega.
+router.get('/track/:code', async (req, res) => {
+  const code = req.params.code.trim();
+  if (code.length < 4) return res.status(400).json({ error: 'Código muito curto' });
+
+  // Tenta primeiro por trackingCode (mais provável), depois por id do pedido.
+  let order = await prisma.order.findFirst({
+    where: { trackingCode: code },
+    include: { items: true },
+  });
+  if (!order) {
+    order = await prisma.order.findUnique({
+      where: { id: code },
+      include: { items: true },
+    });
+  }
+  if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
+
+  res.json({
+    id: order.id,
+    status: order.status,
+    trackingCode: order.trackingCode,
+    createdAt: order.createdAt,
+    statusHistory: order.statusHistory ?? [],
+    delivery: {
+      city: order.addressCity,
+      state: order.addressState,
+    },
+    items: order.items.map((i) => ({
+      name: i.name,
+      size: i.size,
+      quantity: i.quantity,
+    })),
+  });
+});
+
 router.get('/mine', requireAuth, async (req: AuthedRequest, res) => {
   const orders = await prisma.order.findMany({
     where: { userId: req.user!.uid },
@@ -330,6 +412,24 @@ router.patch('/:id/status', requireAuth, requireAdmin, async (req: AuthedRequest
     },
     include: { items: true },
   });
+
+  // Dispara e-mail só pra etapas "úteis" pro cliente. "cancelado" não manda
+  // e-mail por enquanto (poderia, mas precisaria de template novo).
+  const newStatus = parsed.data.status;
+  if (newStatus === 'pago' || newStatus === 'enviado' || newStatus === 'entregue') {
+    fireOrderEmail(updated.userEmail, newStatus, {
+      id: updated.id,
+      customerName: updated.addressFullName,
+      items: updated.items.map((i) => ({
+        name: i.name, size: i.size, quantity: i.quantity, unitPrice: i.unitPrice,
+      })),
+      total: updated.total,
+      trackingCode: updated.trackingCode,
+      city: updated.addressCity,
+      state: updated.addressState,
+    });
+  }
+
   res.json(serialize(updated));
 });
 

@@ -1,11 +1,17 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GoogleButton from '../components/GoogleButton';
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Se o usuário foi mandado pra cá por uma rota protegida (ProtectedRoute),
+  // location.state.from guarda o caminho original — voltamos pra lá após login.
+  const from = (location.state as { from?: string } | null)?.from ?? '/';
+  const isCheckoutFlow = from.startsWith('/checkout');
+
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +23,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(identifier, password);
-      navigate('/');
+      navigate(from, { replace: true });
     } catch (e: any) {
       setError(e.message ?? 'Erro ao entrar');
     } finally {
@@ -29,7 +35,25 @@ export default function Login() {
     <div className="auth-shell">
       <form className="card auth-card col" onSubmit={onSubmit}>
         <h1 style={{ margin: 0 }}>⚽ Entrar</h1>
-        <p className="muted" style={{ marginTop: 0 }}>Bem-vindo de volta.</p>
+        <p className="muted" style={{ marginTop: 0 }}>
+          {isCheckoutFlow
+            ? 'Entre na sua conta para finalizar o pedido.'
+            : 'Bem-vindo de volta.'}
+        </p>
+
+        {isCheckoutFlow && (
+          <div
+            className="alert"
+            style={{
+              background: 'rgba(34, 197, 94, 0.08)',
+              border: '1px solid rgba(34, 197, 94, 0.35)',
+              color: '#22c55e',
+              fontSize: '0.85rem',
+            }}
+          >
+            🛒 Seu carrinho está esperando — você volta direto pro checkout depois de entrar.
+          </div>
+        )}
 
         {error && <div className="alert error">{error}</div>}
         <div>

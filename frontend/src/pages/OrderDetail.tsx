@@ -26,9 +26,23 @@ export default function OrderDetail() {
     <div>
       <h1 className="page-title">Pedido #{order.id.slice(0, 8)}</h1>
       <p className="muted">Criado em {formatDate(order.createdAt)}</p>
-      <div className="row" style={{ marginBottom: '1rem' }}>
+      <div className="row" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
         <span className={`tag ${statusClass[order.status]}`}>{order.status}</span>
-        {order.trackingCode && <span className="tag">Rastreio: {order.trackingCode}</span>}
+        {order.trackingCode && (
+          <a
+            href={`https://rastreamento.correios.com.br/app/index.php?objetos=${encodeURIComponent(order.trackingCode)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="tag"
+            style={{ textDecoration: 'none' }}
+            title="Abrir nos Correios"
+          >
+            🚚 Rastreio: {order.trackingCode} ↗
+          </a>
+        )}
+        <Link to={`/track/${encodeURIComponent(order.trackingCode ?? order.id)}`} className="tag">
+          📍 Acompanhar
+        </Link>
         <button onClick={() => downloadNfPdf(order)}>📄 Baixar Nota Fiscal (PDF) — simulada</button>
       </div>
 
