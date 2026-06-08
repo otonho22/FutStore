@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api } from '../../lib/api';
 import { brl } from '../../lib/format';
 import type { Product, ProductSize } from '../../types';
@@ -7,11 +7,15 @@ const EMPTY: Omit<Product, 'id'> = {
   name: '', team: '', description: '', price: 0,
   imageUrl: '', images: [],
   sizes: [
-    { size: 'P', stock: 0 }, { size: 'M', stock: 0 },
-    { size: 'G', stock: 0 }, { size: 'GG', stock: 0 },
+    { size: 'P', stock: 0, minStock: 3 }, { size: 'M', stock: 0, minStock: 3 },
+    { size: 'G', stock: 0, minStock: 3 }, { size: 'GG', stock: 0, minStock: 3 },
   ],
   category: 'Times Brasileiros', active: true,
 };
+
+export function isLowStock(p: Product): boolean {
+  return p.sizes.some((s) => s.stock <= (s.minStock ?? 3));
+}
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -25,6 +29,11 @@ export default function AdminProducts() {
   }
   useEffect(() => { refresh(); }, []);
 
+  const lowStockCount = useMemo(
+    () => products.reduce((sum, p) => sum + p.sizes.filter((s) => s.stock <= (s.minStock ?? 3)).length, 0),
+    [products],
+  );
+
   function startNew() {
     setEditing(null);
     setDraft(EMPTY);
@@ -33,7 +42,11 @@ export default function AdminProducts() {
     setEditing(p);
     const { id: _id, ...rest } = p;
     void _id;
-    setDraft({ ...EMPTY, ...rest });
+    setDraft({
+      ...EMPTY,
+      ...rest,
+      sizes: rest.sizes.map((s) => ({ ...s, minStock: s.minStock ?? 3 })),
+    });
   }
 
   function setSize(idx: number, field: keyof ProductSize, value: any) {
@@ -52,7 +65,11 @@ export default function AdminProducts() {
       const body = {
         ...draft,
         price: Number(draft.price),
-        sizes: draft.sizes.map((s) => ({ size: s.size, stock: Number(s.stock) })),
+        sizes: draft.sizes.map((s) => ({
+          size: s.size,
+          stock: Number(s.stock),
+          minStock: Number(s.minStock ?? 3),
+        })),
         images: draft.images.filter(Boolean),
       };
       if (editing) {
@@ -79,6 +96,12 @@ export default function AdminProducts() {
     <div>
       <h1 className="page-title">Admin — Produtos</h1>
 
+      {lowStockCount > 0 && (
+        <div className="alert" style={{ background: '#3a2a18', borderColor: '#a16207', color: '#fde68a', marginBottom: '1rem' }}>
+          ⚠️ <strong>{lowStockCount}</strong> {lowStockCount === 1 ? 'variação está' : 'variações estão'} com estoque baixo (≤ mínimo definido).
+        </div>
+      )}
+
       <div className="grid" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', alignItems: 'start' }}>
         <form className="card col" onSubmit={onSubmit}>
           <h2 className="section-title" style={{ marginTop: 0 }}>
@@ -103,23 +126,34 @@ export default function AdminProducts() {
             <div style={{ flex: 1 }}><label>Preço (R$)</label>
               <input type="number" step="0.01" min={0} required value={draft.price}
                 onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) })} /></div>
-            <div style={{ flex: 2 }}><label>URL da imagem principal</label>
-              <input type="url" required value={draft.imageUrl}
+            <div style={{ flex: 2 }}><label>URL ou caminho da imagem (ex: /jerseys/flamengo.jpg)</label>
+              <input type="text" required value={draft.imageUrl}
                 onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })} /></div>
           </div>
           <div><label>Imagens adicionais (até 4 URLs, uma por linha)</label>
             <textarea rows={2} value={draft.images.join('\n')}
               onChange={(e) => setDraft({ ...draft, images: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 4) })} /></div>
           <div>
-            <label>Tamanhos e estoque</label>
+            <label>Tamanhos · estoque · mínimo</label>
             <div className="row">
-              {draft.sizes.map((s, idx) => (
-                <div key={idx} className="col" style={{ flex: 1, minWidth: 90 }}>
-                  <input value={s.size} onChange={(e) => setSize(idx, 'size', e.target.value)} />
-                  <input type="number" min={0} value={s.stock}
-                    onChange={(e) => setSize(idx, 'stock', Number(e.target.value))} />
-                </div>
-              ))}
+              {draft.sizes.map((s, idx) => {
+                const low = Number(s.stock) <= Number(s.minStock ?? 3);
+                return (
+                  <div key={idx} className="col" style={{ flex: 1, minWidth: 90 }}>
+                    <input value={s.size} onChange={(e) => setSize(idx, 'size', e.target.value)} />
+                    <input type="number" min={0} value={s.stock}
+                      title="Estoque atual"
+                      style={low ? { borderColor: '#dc2626' } : undefined}
+                      onChange={(e) => setSize(idx, 'stock', Number(e.target.value))} />
+                    <input type="number" min={0} value={s.minStock ?? 3}
+                      title="Estoque mínimo (alerta quando estoque ≤ mín)"
+                      onChange={(e) => setSize(idx, 'minStock', Number(e.target.value))} />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="muted" style={{ fontSize: '0.8rem', marginTop: 4 }}>
+              3 campos por tamanho: nome · estoque · mínimo. Vermelho = abaixo do mínimo.
             </div>
           </div>
           <label style={{ display: 'flex', gap: '0.5rem' }}>
@@ -139,21 +173,27 @@ export default function AdminProducts() {
           <h2 className="section-title" style={{ marginTop: 0 }}>Cadastrados ({products.length})</h2>
           <table>
             <thead>
-              <tr><th>Nome</th><th>Time</th><th>Preço</th><th>Vendas</th><th /></tr>
+              <tr><th>Nome</th><th>Time</th><th>Preço</th><th>Vendas</th><th>Estoque</th><th /></tr>
             </thead>
             <tbody>
-              {products.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.name}</td>
-                  <td className="muted">{p.team}</td>
-                  <td>{brl(p.price)}</td>
-                  <td>{p.salesCount ?? 0}</td>
-                  <td className="right">
-                    <button onClick={() => startEdit(p)}>Editar</button>{' '}
-                    <button className="danger" onClick={() => onDelete(p.id)}>Excluir</button>
-                  </td>
-                </tr>
-              ))}
+              {products.map((p) => {
+                const low = isLowStock(p);
+                return (
+                  <tr key={p.id}>
+                    <td>{p.name}</td>
+                    <td className="muted">{p.team}</td>
+                    <td>{brl(p.price)}</td>
+                    <td>{p.salesCount ?? 0}</td>
+                    <td>
+                      {low ? <span className="tag danger">estoque baixo</span> : <span className="tag success">ok</span>}
+                    </td>
+                    <td className="right">
+                      <button onClick={() => startEdit(p)}>Editar</button>{' '}
+                      <button className="danger" onClick={() => onDelete(p.id)}>Excluir</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -8,15 +8,22 @@ const router = Router();
 const sizeSchema = z.object({
   size: z.string().min(1),
   stock: z.number().int().min(0),
+  minStock: z.number().int().min(0).optional(),
 });
+
+// Aceita URL absoluta (http/https) ou path absoluto (/jerseys/...) para imagens locais
+const imageRef = z.string().min(1).refine(
+  (s) => s.startsWith('/') || /^https?:\/\//.test(s),
+  { message: 'Deve ser URL http(s) ou caminho começando com /' },
+);
 
 const productSchema = z.object({
   name: z.string().min(1),
   team: z.string().min(1),
   description: z.string().default(''),
   price: z.number().positive(),
-  imageUrl: z.string().url(),
-  images: z.array(z.string().url()).max(4).default([]),
+  imageUrl: imageRef,
+  images: z.array(imageRef).max(4).default([]),
   sizes: z.array(sizeSchema).min(1),
   category: z.string().min(1),
   active: z.boolean().default(true),
@@ -35,7 +42,7 @@ function serialize(p: any) {
     salesCount: p.salesCount,
     active: p.active,
     createdAt: p.createdAt,
-    sizes: (p.sizes ?? []).map((s: any) => ({ size: s.size, stock: s.stock })),
+    sizes: (p.sizes ?? []).map((s: any) => ({ size: s.size, stock: s.stock, minStock: s.minStock })),
   };
 }
 

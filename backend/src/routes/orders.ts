@@ -124,13 +124,29 @@ router.post('/', requireAuth, async (req: AuthedRequest, res) => {
         subtotal += item.unitPrice * item.quantity;
       }
 
-      // 3) Cupom (opcional)
+      // 3) Cupom (opcional) — replica as regras de /coupons/validate/:code dentro da transação
       let discount = 0;
       let appliedCoupon: string | null = null;
       if (couponCode) {
         const code = couponCode.toUpperCase();
         const coupon = await tx.coupon.findUnique({ where: { code } });
         if (coupon && coupon.active && coupon.validUntil >= new Date()) {
+          const userId = req.user!.uid;
+          const notCancelled = { status: { not: 'cancelado' } as const };
+
+          if (coupon.firstPurchaseOnly) {
+            const prev = await tx.order.count({ where: { userId, ...notCancelled } });
+            if (prev > 0) throw new Error('Cupom válido apenas na primeira compra');
+          }
+          if (coupon.maxUsesGlobal != null) {
+            const used = await tx.order.count({ where: { couponCode: code, ...notCancelled } });
+            if (used >= coupon.maxUsesGlobal) throw new Error('Cupom esgotado');
+          }
+          if (coupon.maxUsesPerCustomer != null) {
+            const usedByUser = await tx.order.count({ where: { couponCode: code, userId, ...notCancelled } });
+            if (usedByUser >= coupon.maxUsesPerCustomer) throw new Error('Limite de uso por cliente atingido');
+          }
+
           discount = coupon.type === 'percent' ? subtotal * (coupon.value / 100) : coupon.value;
           discount = Math.min(discount, subtotal);
           appliedCoupon = code;
@@ -198,6 +214,67 @@ router.post('/', requireAuth, async (req: AuthedRequest, res) => {
   } catch (e: any) {
     res.status(400).json({ error: e.message ?? 'Erro ao criar pedido' });
   }
+});
+
+router.get('/bi/summary', requireAuth, requireAdmin, async (req, res) => {
+  const { from, to, category, status } = req.query as Record<string, string | undefined>;
+
+  const where: any = {};
+  if (from || to) {
+    where.createdAt = {};
+    if (from) where.createdAt.gte = new Date(from);
+    if (to) {
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      where.createdAt.lte = end;
+    }
+  }
+  if (status) where.status = status;
+
+  const orders = await prisma.order.findMany({
+    where,
+    include: { items: { include: { product: true } } },
+  });
+
+  const topProductsMap = new Map<string, { productId: string; name: string; qty: number; revenue: number }>();
+  const bySizeMap = new Map<string, number>();
+  const byCategoryMap = new Map<string, number>();
+  let totalRevenue = 0;
+  let totalOrders = 0;
+
+  for (const order of orders) {
+    let matched = 0;
+    let revenueForOrder = 0;
+    for (const item of order.items) {
+      const itemCat = item.product?.category ?? 'Outros';
+      if (category && itemCat !== category) continue;
+      matched++;
+      revenueForOrder += item.unitPrice * item.quantity;
+
+      const cur = topProductsMap.get(item.productId);
+      if (cur) { cur.qty += item.quantity; cur.revenue += item.unitPrice * item.quantity; }
+      else topProductsMap.set(item.productId, {
+        productId: item.productId, name: item.name,
+        qty: item.quantity, revenue: item.unitPrice * item.quantity,
+      });
+
+      bySizeMap.set(item.size, (bySizeMap.get(item.size) ?? 0) + item.quantity);
+      byCategoryMap.set(itemCat, (byCategoryMap.get(itemCat) ?? 0) + item.quantity);
+    }
+    if (matched > 0) {
+      totalOrders++;
+      totalRevenue += category ? revenueForOrder : order.total;
+    }
+  }
+
+  res.json({
+    topProducts: Array.from(topProductsMap.values()).sort((a, b) => b.qty - a.qty).slice(0, 10),
+    bySize: Array.from(bySizeMap.entries()).map(([size, qty]) => ({ size, qty }))
+      .sort((a, b) => b.qty - a.qty),
+    byCategory: Array.from(byCategoryMap.entries()).map(([cat, qty]) => ({ category: cat, qty })),
+    totalOrders,
+    totalRevenue,
+  });
 });
 
 router.get('/mine', requireAuth, async (req: AuthedRequest, res) => {

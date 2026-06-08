@@ -1,4 +1,4 @@
-export interface ProductSize { size: string; stock: number; }
+export interface ProductSize { size: string; stock: number; minStock?: number; }
 
 export interface Product {
   id: string;
@@ -21,6 +21,9 @@ export interface Coupon {
   value: number;
   validUntil: string;
   active: boolean;
+  firstPurchaseOnly?: boolean;
+  maxUsesPerCustomer?: number | null;
+  maxUsesGlobal?: number | null;
 }
 
 export interface CartItem {

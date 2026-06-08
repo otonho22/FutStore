@@ -13,6 +13,7 @@ const Icon = ({ d }: { d: string }) => (
 const ICONS = {
   dash: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',
   cat: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
+  cup: 'M8 21h8 M12 17v4 M7 4h10v5a5 5 0 01-10 0V4z M17 5h2a2 2 0 010 4h-2 M7 5H5a2 2 0 100 4h2',
   cart: 'M6 6h15l-1.5 9H7.5L6 6zM6 6L5 3H2M9 21a1 1 0 100-2 1 1 0 000 2zM20 21a1 1 0 100-2 1 1 0 000 2z',
   orders: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z M14 2v6h6 M8 13h8 M8 17h5',
   admin: 'M12 2l8 4v6c0 5-3.5 9.5-8 10-4.5-.5-8-5-8-10V6l8-4z',
@@ -42,6 +43,10 @@ export default function Sidebar() {
         <nav onClick={close}>
           <NavLink to="/" end><Icon d={ICONS.dash} /> Dashboard</NavLink>
           <NavLink to="/catalog"><Icon d={ICONS.cat} /> Catálogo</NavLink>
+          <NavLink to="/copa-2026" style={{ background: 'linear-gradient(90deg, rgba(251,191,36,0.12), transparent)' }}>
+            <Icon d={ICONS.cup} /> Copa 2026
+            <span className="tag" style={{ marginLeft: 'auto', background: '#fbbf24', color: '#000', fontSize: '0.65rem', fontWeight: 800 }}>NOVO</span>
+          </NavLink>
           <NavLink to="/cart">
             <Icon d={ICONS.cart} /> Carrinho
             {cartCount > 0 && <span className="tag success" style={{ marginLeft: 'auto' }}>{cartCount}</span>}

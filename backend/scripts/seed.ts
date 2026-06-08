@@ -1,8 +1,23 @@
 import 'dotenv/config';
 import { prisma } from '../src/db.js';
 
-function placeholder(text: string, color = '22c55e') {
-  return `https://placehold.co/600x600/0f1115/${color}/png?text=${encodeURIComponent(text)}`;
+// Mapeia time -> foto local em /frontend/public/jerseys/<slug>.jpg
+// Fotos baixadas do Wikimedia Commons (CC). Todas as variantes do mesmo time reusam a foto.
+const TEAM_PHOTO: Record<string, string> = {
+  'Flamengo': '/jerseys/flamengo.jpg',
+  'Palmeiras': '/jerseys/palmeiras.jpg',
+  'Corinthians': '/jerseys/corinthians.jpg',
+  'São Paulo': '/jerseys/sao-paulo.jpg',
+  'Grêmio': '/jerseys/gremio.jpg',
+  'Real Madrid': '/jerseys/real-madrid.jpg',
+  'FC Barcelona': '/jerseys/fc-barcelona.jpg',
+  'Manchester City': '/jerseys/manchester-city.jpg',
+  'Seleção Brasileira': '/jerseys/selecao-brasileira.jpg',
+  'Seleção Argentina': '/jerseys/selecao-argentina.jpg',
+};
+
+function jerseyPhoto(team: string): string {
+  return TEAM_PHOTO[team] ?? '';
 }
 
 type Variant = { label: string; color: string; priceDelta?: number; salesCount: number };
@@ -117,7 +132,7 @@ async function main() {
           team: t.team,
           description: t.description,
           price: t.basePrice + (v.priceDelta ?? 0),
-          imageUrl: placeholder(`${t.team}\n${v.label}`, v.color),
+          imageUrl: jerseyPhoto(t.team),
           category: t.category,
           salesCount: v.salesCount,
           active: true,

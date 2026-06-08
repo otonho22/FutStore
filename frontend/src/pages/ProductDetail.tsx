@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { brl } from '../lib/format';
 import { useCart } from '../context/CartContext';
+import JerseyImage from '../components/JerseyImage';
 import type { Product } from '../types';
 
 export default function ProductDetail() {
@@ -12,20 +13,31 @@ export default function ProductDetail() {
   const [product, setProduct] = useState<Product | null>(null);
   const [size, setSize] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [activeImg, setActiveImg] = useState<string>('');
+  const [zoomOpen, setZoomOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     api<Product>(`/api/products/${id}`).then((p) => {
       setProduct(p);
+      setActiveImg(p.imageUrl);
       const first = p.sizes.find((s) => s.stock > 0);
       setSize(first?.size ?? '');
     }).catch((e) => setError(e.message));
   }, [id]);
 
+  useEffect(() => {
+    if (!zoomOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setZoomOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zoomOpen]);
+
   if (error) return <div className="alert error">{error}</div>;
   if (!product) return <p className="muted">Carregando…</p>;
 
   const chosen = product.sizes.find((s) => s.size === size);
+  const gallery = [product.imageUrl, ...(product.images ?? [])].filter((u, i, arr) => u && arr.indexOf(u) === i);
 
   function handleAdd() {
     if (!chosen || chosen.stock < 1) return;
@@ -43,13 +55,32 @@ export default function ProductDetail() {
   return (
     <div className="grid" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', alignItems: 'start' }}>
       <div>
-        <img src={product.imageUrl} alt={product.name}
-          style={{ width: '100%', borderRadius: 'var(--radius)', background: 'var(--bg-elev-2)' }} />
-        {product.images?.length > 0 && (
-          <div className="row" style={{ marginTop: '0.5rem' }}>
-            {product.images.map((url) => (
-              <img key={url} src={url} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6 }} />
-            ))}
+        <div
+          onClick={() => setZoomOpen(true)}
+          title="Clique para ampliar"
+          style={{ cursor: 'zoom-in' }}
+        >
+          <JerseyImage imageUrl={activeImg || product.imageUrl} team={product.team} name={product.name} alt={product.name}
+            style={{ width: '100%', borderRadius: 'var(--radius)', background: 'var(--bg-elev-2)' }} />
+        </div>
+        {gallery.length > 1 && (
+          <div className="row" style={{ marginTop: '0.5rem', flexWrap: 'wrap' }}>
+            {gallery.map((url) => {
+              const isActive = (activeImg || product.imageUrl) === url;
+              return (
+                <button
+                  key={url}
+                  onClick={() => setActiveImg(url)}
+                  title="Trocar imagem"
+                  style={{
+                    padding: 0, border: isActive ? '2px solid var(--primary)' : '2px solid transparent',
+                    borderRadius: 8, background: 'transparent', cursor: 'pointer',
+                  }}
+                >
+                  <JerseyImage imageUrl={url} team={product.team} name={product.name} size={64} />
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -89,6 +120,33 @@ export default function ProductDetail() {
           Adicionar ao carrinho
         </button>
       </div>
+
+      {zoomOpen && (
+        <div
+          onClick={() => setZoomOpen(false)}
+          role="dialog"
+          aria-label="Imagem ampliada"
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, cursor: 'zoom-out', padding: '2rem',
+          }}
+        >
+          <div style={{ maxWidth: '90vw', maxHeight: '90vh', width: 'min(720px, 90vw)' }} onClick={(e) => e.stopPropagation()}>
+            <JerseyImage imageUrl={activeImg || product.imageUrl} team={product.team} name={product.name} alt={product.name}
+              style={{ width: '100%', borderRadius: 'var(--radius)' }} />
+          </div>
+          <button
+            onClick={() => setZoomOpen(false)}
+            aria-label="Fechar"
+            style={{
+              position: 'absolute', top: 16, right: 16,
+              background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none',
+              borderRadius: 999, width: 40, height: 40, fontSize: 20, cursor: 'pointer',
+            }}
+          >×</button>
+        </div>
+      )}
     </div>
   );
 }
